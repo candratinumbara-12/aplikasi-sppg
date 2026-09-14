@@ -363,15 +363,13 @@ else:
                     type="primary"
                 )
                 # ==========================================
-# KELAS GENERATOR PDF LAPORAN LENGKAP
+# ==========================================
+# KELAS GENERATOR PDF LAPORAN KUSTOM RAPI
 # ==========================================
 class PDFReport(FPDF):
     def header(self):
-        self.set_font("Arial", "B", 12)
-        self.cell(0, 8, "LAPORAN CHECKLIST HARIAN OPERASIONAL SPPG", 0, 1, "C")
-        self.set_font("Arial", "", 9)
-        self.cell(0, 5, "Badan Gizi Nasional - Program Pemenuhan Gizi Nasional", 0, 1, "C")
-        self.ln(5)
+        # Header kosong agar halaman berikutnya tidak otomatis menimpa
+        pass
 
     def footer(self):
         self.set_y(-15)
@@ -383,67 +381,119 @@ def generate_pdf(d):
     pdf.add_page()
     pdf.set_font("Arial", "", 9)
 
-    def add_section_title(title):
-        pdf.ln(3)
+    # 1. Judul Utama (Kotak Biru Tua)
+    pdf.set_fill_color(0, 43, 91)      # Warna Biru Tua (#002B5B)
+    pdf.set_text_color(255, 255, 255)  # Teks Putih
+    pdf.set_font("Arial", "B", 11)
+    pdf.cell(0, 8, "CHECKLIST HARIAN - KOORDINASI ZOOM", 1, 1, "C", fill=True)
+    
+    # Reset warna teks ke hitam
+    pdf.set_text_color(0, 0, 0)
+    pdf.set_font("Arial", "", 9)
+
+    # 2. Tabel Identitas 2 Kolom Atas
+    col_w = 95
+    row_h = 6
+    
+    identitas_rows = [
+        ("Nama SPPG: " + str(d.get("nama_sppg")), "Pengawas Keu: " + str(d.get("pengawas_keu", "-"))),
+        ("Kepala SPPG: " + str(d.get("kepala_sppg")), "Pengawas Gizi: " + str(d.get("pengawas_gizi"))),
+        ("Tanggal: " + str(d.get("tanggal")), "Asisten Lapangan: " + str(d.get("asisten_lapangan", "-"))),
+        ("Jam Mulai Zoom: " + str(d.get("jam_zoom")), "Chef: " + str(d.get("chef", "-")))
+    ]
+
+    for col1_text, col2_text in identitas_rows:
+        pdf.cell(col_w, row_h, col1_text, 1, 0, "L")
+        pdf.cell(col_w, row_h, col2_text, 1, 1, "L")
+
+    pdf.ln(3)
+
+    # Helper untuk Section Header (Kotak Biru Muda)
+    def add_section_header(title):
+        pdf.set_fill_color(218, 230, 242)  # Biru Muda lembut
         pdf.set_font("Arial", "B", 10)
-        pdf.cell(0, 6, title, 0, 1, "L")
+        pdf.cell(0, 6, title, 1, 1, "L", fill=True)
         pdf.set_font("Arial", "", 9)
 
-    def add_row(kunci, nilai):
-        pdf.cell(75, 5, f"- {kunci}:", 0, 0)
-        pdf.cell(0, 5, f"{nilai}", 0, 1)
+    def add_item(kunci, nilai):
+        pdf.cell(0, 5, f"  - {kunci}: {nilai}", 0, 1, "L")
 
-    # I. IDENTITAS & DATA UMUM
-    add_section_title("I. IDENTITAS & DATA UMUM")
-    add_row("Nama SPPG", d.get("nama_sppg"))
-    add_row("Kepala SPPG", d.get("kepala_sppg"))
-    add_row("Pengawas Gizi", d.get("pengawas_gizi"))
-    add_row("Tanggal Checklist", d.get("tanggal"))
-    add_row("Jam Mulai Zoom", d.get("jam_zoom"))
-    add_row("Jumlah PM Peserta Didik", d.get("pm_didik"))
-    add_row("Jumlah PM 3B (Ibu Hamil/Balita)", d.get("pm_3b"))
-    add_row("Sertifikat SLHS", d.get("sertif_slhs"))
-    add_row("Sertifikat Halal", d.get("sertif_halal"))
-    add_row("Sertifikat BNSP Chef", d.get("sertif_bnsp"))
-    add_row("Sumber Air Minum / pH", f"{d.get('sumber_air_minum')} (pH: {d.get('ph_minum')})")
-    add_row("Sumber Air Masak / pH", f"{d.get('sumber_air_masak')} (pH: {d.get('ph_masak')})")
-    add_row("Kondisi Ruangan", f"Termometer: {d.get('ruang_termo')}, Sesuai Standar: {d.get('ruang_suhu')} ({d.get('suhu_ruang')} C), Bersih: {d.get('ruang_bersih')}, Insect Killer: {d.get('insect_killer')}")
+    # I. DATA UMUM
+    add_section_header("I. DATA UMUM")
+    pdf.cell(0, 5, "  Jumlah Penerima Manfaat (PM):", 0, 1, "L")
+    pdf.cell(0, 5, f"    - Peserta Didik: {d.get('pm_didik')} dilayani", 0, 1, "L")
+    pdf.cell(0, 5, f"    - Ibu Hamil/Menyusui/Balita: {d.get('pm_3b')} dilayani", 0, 1, "L")
+    
+    pdf.cell(0, 5, "  Sertifikasi:", 0, 1, "L")
+    pdf.cell(0, 5, f"    - SLHS: {d.get('sertif_slhs')}", 0, 1, "L")
+    pdf.cell(0, 5, f"    - Halal: {d.get('sertif_halal')}", 0, 1, "L")
+    pdf.cell(0, 5, f"    - BNSP Chef: {d.get('sertif_bnsp')}", 0, 1, "L")
 
-    # II. PENERIMAAN & PENYIMPANAN
-    add_section_title("II. PENERIMAAN DAN PENYIMPANAN BAHAN BAKU")
-    add_row("Jam Kedatangan Bahan", f"Karbo: {d.get('t_karbo')}, Prohe: {d.get('t_prohe')}, Prona: {d.get('t_prona')}, Sayur: {d.get('t_sayur')}, Buah: {d.get('t_buah')}")
-    add_row("Kesesuaian Spesifikasi", f"Karbo: {d.get('k_karbo')}, Prohe: {d.get('k_prohe')}, Prona: {d.get('k_prona')}, Sayur: {d.get('k_sayur')}, Buah: {d.get('k_buah')}")
-    add_row("Suhu & Penyimpanan", f"Beku 1: {d.get('s_beku1')}, Beku 2: {d.get('s_beku2')}, Chiller: {d.get('s_chiller')}, Freezer: {d.get('s_freezer')}")
-    add_row("Penanganan Bahan Makanan", f"Dicuci air mengalir: {d.get('b_dicuci')}, Tahu di chiller: {d.get('tahu_chiller')}, Rotasi FIFO/FEFO: {d.get('rotasi_fifo')}")
+    pdf.cell(0, 5, "  Sumber Air Bersih:", 0, 1, "L")
+    pdf.cell(0, 5, f"    - Air Minum: {d.get('sumber_air_minum')} (pH: {d.get('ph_minum')})", 0, 1, "L")
+    pdf.cell(0, 5, f"    - Air Masak: {d.get('sumber_air_masak')} (pH: {d.get('ph_masak')})", 0, 1, "L")
+
+    pdf.cell(0, 5, "  Kondisi Ruangan:", 0, 1, "L")
+    pdf.cell(0, 5, f"    - Termometer tersedia: {d.get('ruang_termo')}", 0, 1, "L")
+    pdf.cell(0, 5, f"    - Suhu sesuai standar: {d.get('ruang_suhu')} ({d.get('suhu_ruang')})", 0, 1, "L")
+    pdf.cell(0, 5, f"    - Ruangan bersih: {d.get('ruang_bersih')}", 0, 1, "L")
+    pdf.cell(0, 5, f"    - Insect killer berfungsi: {d.get('insect_killer')}", 0, 1, "L")
+    pdf.ln(2)
+
+    # II. PENERIMAAN BAHAN BAKU
+    add_section_header("II. PENERIMAAN BAHAN BAKU")
+    pdf.cell(0, 5, "  Waktu Penerimaan Bahan Baku:", 0, 1, "L")
+    pdf.cell(0, 5, f"    - Karbohidrat: {d.get('t_karbo')}", 0, 1, "L")
+    pdf.cell(0, 5, f"    - Protein Hewani: {d.get('t_prohe')}", 0, 1, "L")
+    pdf.cell(0, 5, f"    - Protein Nabati: {d.get('t_prona')}", 0, 1, "L")
+    pdf.cell(0, 5, f"    - Sayuran: {d.get('t_sayur')}", 0, 1, "L")
+    pdf.cell(0, 5, f"    - Buah: {d.get('t_buah')}", 0, 1, "L")
+
+    pdf.cell(0, 5, "  Kesesuaian Stok:", 0, 1, "L")
+    pdf.cell(0, 5, f"    - Karbohidrat: {d.get('k_karbo')}", 0, 1, "L")
+    pdf.cell(0, 5, f"    - Protein Hewani: {d.get('k_prohe')}", 0, 1, "L")
+    pdf.cell(0, 5, f"    - Protein Nabati: {d.get('k_prona')}", 0, 1, "L")
+    pdf.cell(0, 5, f"    - Sayur: {d.get('k_sayur')}", 0, 1, "L")
+    pdf.cell(0, 5, f"    - Buah: {d.get('k_buah')}", 0, 1, "L")
+    pdf.ln(2)
 
     # III. PERSIAPAN & PENGOLAHAN
-    add_section_title("III. PERSIAPAN, PENGOLAHAN DAN PENDINGINAN")
-    add_row("Personal Higiene & APD", f"Tim sakit/demam: {d.get('hig_sakit')}, CTPS: {d.get('hig_ctps')}, APD: {d.get('apd_pakai')}")
-    add_row("SOP & Menu Rawan", f"SOP Prohe: {d.get('persiapan_sop')}, Bau/Warna tidak wajar: {d.get('persiapan_bau')}, Menu Rawan: {d.get('menu_rawan')}")
-    add_row("Proses Pengolahan", f"Matang Sempurna: {d.get('olah_matang')}, Suhu Matang: {d.get('suhu_matang')}, SOP Pengolahan: {d.get('olah_sop')}")
+    add_section_header("III. PERSIAPAN, PENGOLAHAN DAN PENDINGINAN")
+    pdf.cell(0, 5, f"  Tim sakit / demam / batuk: {d.get('hig_sakit')}", 0, 1, "L")
+    pdf.cell(0, 5, f"  Penggunaan APD lengkap: {d.get('apd_pakai')}", 0, 1, "L")
+    pdf.cell(0, 5, f"  Cuci Tangan Pakai Sabun (CTPS): {d.get('hig_ctps')}", 0, 1, "L")
+    pdf.cell(0, 5, f"  Menu Rawan Hari Ini: {d.get('menu_rawan')}", 0, 1, "L")
+    pdf.cell(0, 5, f"  Pengecekan Suhu Matang Sempurna: {d.get('suhu_matang')}", 0, 1, "L")
+    pdf.ln(2)
 
     # IV. PENGEMASAN & DISTRIBUSI
-    add_section_title("IV. PENGEMASAN DAN DISTRIBUSI")
-    add_row("Waktu & Suhu Pengemasan", f"Jam: {d.get('jam_kemas')} | Suhu: {d.get('suhu_kemas')}")
-    add_row("Wadah & Distribusi", f"Wadah Food Grade: {d.get('wadah_pangan')} | Tepat Waktu: {d.get('distrib_tepat')}")
+    add_section_header("IV. PENGEMASAN DAN DISTRIBUSI")
+    pdf.cell(0, 5, f"  Jam Pengemasan: {d.get('jam_kemas')}", 0, 1, "L")
+    pdf.cell(0, 5, f"  Suhu Makanan Saat Dikemas: {d.get('suhu_kemas')}", 0, 1, "L")
+    pdf.cell(0, 5, f"  Wadah Pangan Food Grade: {d.get('wadah_pangan')}", 0, 1, "L")
+    pdf.cell(0, 5, f"  Distribusi Tepat Waktu: {d.get('distrib_tepat')}", 0, 1, "L")
+    pdf.ln(2)
 
     # V. PENGAWASAN MUTU & SAMPEL
-    add_section_title("V. PENGAWASAN MUTU & SAMPEL MAKANAN")
-    add_row("Uji Organoleptik", f"Dilakukan oleh Pengawas Gizi: {d.get('uji_organoleptik')}")
-    add_row("Food Sample (2x24 Jam)", f"Disimpan: {d.get('sampel_simpan')} (Suhu: {d.get('suhu_sampel')})")
+    add_section_header("V. PENGAWASAN MUTU & SAMPEL")
+    pdf.cell(0, 5, f"  Uji Organoleptik (Rasa/Aroma/Warna): {d.get('uji_organoleptik')}", 0, 1, "L")
+    pdf.cell(0, 5, f"  Penyimpanan Food Sample (2x24 Jam): {d.get('sampel_simpan')} (Suhu: {d.get('suhu_sampel')})", 0, 1, "L")
+    pdf.ln(2)
 
     # VI. KEBERSIHAN & LIMBAH
-    add_section_title("VI. KEBERSIHAN AREA & PENGELOLAAN LIMBAH")
-    add_row("Sanitasi Dapur", f"Pembersihan total area & alat: {d.get('dapur_bersih')}")
-    add_row("Pengelolaan Limbah", f"Sampah & limbah terkelola baik: {d.get('limbah_kelola')}")
+    add_section_header("VI. KEBERSIHAN AREA & PENGELOLAAN LIMBAH")
+    pdf.cell(0, 5, f"  Pembersihan & Sanitasi Dapur Total: {d.get('dapur_bersih')}", 0, 1, "L")
+    pdf.cell(0, 5, f"  Pengelolaan Limbah & Sampah: {d.get('limbah_kelola')}", 0, 1, "L")
+    pdf.ln(2)
 
-    # VII. SISA MAKANAN & CATATAN
-    add_section_title("VII. EVALUASI SISA MAKANAN (PLATE WASTE) & CATATAN")
-    add_row("Sisa Nasi / Karbohidrat", d.get('sisa_nasi'))
-    add_row("Sisa Protein Hewani", d.get('sisa_prohe'))
-    add_row("Sisa Protein Nabati", d.get('sisa_prona'))
-    add_row("Sisa Sayuran", d.get('sisa_sayur'))
-    add_row("Sisa Buah", d.get('sisa_buah'))
-    add_row("Catatan Kendala", d.get('catatan'))
+    # VII. EVALUASI SISA MAKANAN (PLATE WASTE) & CATATAN
+    add_section_header("VII. EVALUASI SISA MAKANAN (PLATE WASTE) & CATATAN KHUSUS")
+    pdf.cell(0, 5, "  Estimasi Sisa Makanan (Gram):", 0, 1, "L")
+    pdf.cell(0, 5, f"    - Sisa Nasi / Karbohidrat: {d.get('sisa_nasi')}", 0, 1, "L")
+    pdf.cell(0, 5, f"    - Sisa Protein Hewani: {d.get('sisa_prohe')}", 0, 1, "L")
+    pdf.cell(0, 5, f"    - Sisa Protein Nabati: {d.get('sisa_prona')}", 0, 1, "L")
+    pdf.cell(0, 5, f"    - Sisa Sayuran: {d.get('sisa_sayur')}", 0, 1, "L")
+    pdf.cell(0, 5, f"    - Sisa Buah: {d.get('sisa_buah')}", 0, 1, "L")
+    pdf.cell(0, 5, f"  Catatan / Kendala Operasional: {d.get('catatan')}", 0, 1, "L")
 
     return pdf.output(dest="S").encode("latin1")
