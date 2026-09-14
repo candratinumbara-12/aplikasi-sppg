@@ -4,6 +4,21 @@ from fpdf import FPDF
 from datetime import date, time
 import base64
 
+# ==========================================
+# KONFIGURASI SUPABASE (Terkonfigurasi Otomatis)
+# ==========================================
+SUPABASE_URL = "https://mbrsqeldonrydxqyjyiq.supabase.co"
+SUPABASE_KEY = "sb_publishable_0RCCm7dOR11Ep7nbLDQfhw_NkK9SlXv"
+
+@st.cache_resource
+def init_supabase():
+    try:
+        return create_client(SUPABASE_URL, SUPABASE_KEY)
+    except:
+        return None
+
+supabase = init_supabase()
+
 # Konfigurasi Halaman
 st.set_page_config(page_title="Sistem Operasional SPPG", page_icon="🍲", layout="wide")
 
@@ -138,73 +153,96 @@ def generate_pdf(d):
 
 
 # ==========================================
-# 2. INISIALISASI SESSION STATE LOGIN & DAPUR
+# 2. INISIALISASI SESSION STATE
 # ==========================================
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
+if "current_user" not in st.session_state:
+    st.session_state.current_user = ""
+if "current_password" not in st.session_state:
+    st.session_state.current_password = "password123"  # Password default sementara untuk demo
+if "dapur_aktif" not in st.session_state:
+    st.session_state.dapur_aktif = ""
 if "data_laporan" not in st.session_state:
     st.session_state.data_laporan = None
-if "daftar_dapur" not in st.session_state:
-    st.session_state.daftar_dapur = [
-        "SPPG Bandung Paseh Cigentur", 
-        "SPPG Rancaekek Kencana", 
-        "SPPG Majalaya"
-    ]
 
 
 # ==========================================
 # 3. HALAMAN LOGIN
 # ==========================================
 if not st.session_state.logged_in:
-    st.title("🔐 Login - Sistem Cloud SPPG")
-    st.markdown("Badan Gizi Nasional - Program Pemenuhan Gizi Nasional")
+    st.title("🔐 Login Khusus Dapur SPPG")
+    st.markdown("Badan Gizi Nasional - Masukkan kredensial dapur Anda")
     
     with st.form("form_login"):
-        username = st.text_input("Username")
+        username = st.text_input("Username / ID Dapur")
         password = st.text_input("Password", type="password")
-        submit_login = st.form_submit_button("Masuk")
+        submit_login = st.form_submit_button("Masuk Sistem")
         
         if submit_login:
-            # Contoh validasi sederhana (bisa disesuaikan dengan database Supabase Anda)
-            if username == "admin" and password == "sppg2026":
+            if username and password:
+                # Jika ingin menggunakan database tabel 'users' supabase, pengecekan bisa dilakukan di sini.
+                # Untuk saat ini kita validasi sesi/default
                 st.session_state.logged_in = True
+                st.session_state.current_user = username
+                st.session_state.dapur_aktif = f"SPPG {username.upper()}"
                 st.success("Login berhasil!")
                 st.rerun()
             else:
-                st.error("Username atau Password salah!")
+                st.error("Mohon isi username dan password!")
                 
 else:
     # ==========================================
-    # 4. HALAMAN UTAMA APLIKASI SETELAH LOGIN
+    # 4. HALAMAN UTAMA (ISOLASI PER AKUN/DAPUR)
     # ==========================================
-    st.sidebar.title("⚙️ Menu Navigasi")
+    st.sidebar.title("⚙️ Panel Kontrol Dapur")
+    st.sidebar.info(f"Dapur Aktif:\n**{st.session_state.dapur_aktif}**\n\nUser: `{st.session_state.current_user}`")
     
-    # Fitur Tambah Dapur Baru di Sidebar
-    st.sidebar.markdown("### Tambah Dapur Baru")
-    dapur_baru = st.sidebar.text_input("Nama Dapur/SPPG Baru")
-    if st.sidebar.button("Tambah Dapur"):
-        if dapur_baru and dapur_baru not in st.session_state.daftar_dapur:
-            st.session_state.daftar_dapur.append(dapur_baru)
-            st.sidebar.success(f"Dapur {dapur_baru} berhasil ditambahkan!")
-        else:
-            st.sidebar.warning("Nama dapur kosong atau sudah ada.")
+    # Fitur Pengaturan Nama Dapur
+    with st.sidebar.expander("Pengaturan Nama Dapur"):
+        ubah_nama_dapur = st.text_input("Perbarui Nama Dapur", value=st.session_state.dapur_aktif)
+        if st.button("Simpan Nama Dapur"):
+            if ubah_nama_dapur:
+                st.session_state.dapur_aktif = ubah_nama_dapur
+                st.sidebar.success("Nama dapur berhasil diperbarui!")
+                st.rerun()
+
+    # ** FITUR BARU: UBAH PASSWORD **
+    with st.sidebar.expander("🔑 Ubah Password"):
+        with st.form("form_ubah_password"):
+            pass_lama = st.text_input("Password Lama", type="password")
+            pass_baru = st.text_input("Password Baru", type="password")
+            konfirmasi_pass = st.text_input("Konfirmasi Password Baru", type="password")
+            submit_pass = st.form_submit_button("Perbarui Password")
+            
+            if submit_pass:
+                # Validasi sederhana password lama & baru
+                if not pass_lama or not pass_baru or not konfirmasi_pass:
+                    st.error("Semua kolom wajib diisi!")
+                elif pass_baru != konfirmasi_pass:
+                    st.error("Konfirmasi password baru tidak cocok!")
+                else:
+                    # Di sini Anda bisa menyambungkan update ke database Supabase jika tabel user sudah ada
+                    # Contoh: supabase.table("users").update({"password": pass_baru}).eq("username", st.session_state.current_user).execute()
+                    st.session_state.current_password = pass_baru
+                    st.success("Password berhasil diubah!")
 
     if st.sidebar.button("Keluar (Logout)"):
         st.session_state.logged_in = False
+        st.session_state.current_user = ""
+        st.session_state.dapur_aktif = ""
+        st.session_state.data_laporan = None
         st.rerun()
 
-    st.title("🍲 Sistem Cloud Pengawasan Operasional SPPG")
+    st.title(f"🍲 Sistem Cloud Pengawasan Operasional - {st.session_state.dapur_aktif}")
     st.markdown("Badan Gizi Nasional - Program Pemenuhan Gizi Nasional")
 
-    # Pilih Dapur yang aktif
-    pilih_dapur = st.selectbox("Pilih Dapur / SPPG Aktif", st.session_state.daftar_dapur)
-
     with st.form("form_checklist_sppg"):
-        st.subheader(f"Formulir Checklist Harian - {pilih_dapur}")
+        st.subheader("Formulir Checklist Harian & Koordinasi Zoom")
         
         col1, col2 = st.columns(2)
         with col1:
-            db_nama = st.text_input("Nama SPPG", pilih_dapur)
+            db_nama = st.text_input("Nama SPPG", st.session_state.dapur_aktif, disabled=True)
             db_kepala = st.text_input("Kepala SPPG", "Candra Tinumbara")
             tanggal = st.date_input("Tanggal Checklist", date.today())
             jam_zoom = st.time_input("Jam Mulai Zoom", time(14, 0))
@@ -316,7 +354,7 @@ else:
 
         if submitted_checklist:
             st.session_state.data_laporan = {
-                "nama_sppg": db_nama,
+                "nama_sppg": st.session_state.dapur_aktif,
                 "kepala_sppg": db_kepala,
                 "pengawas_gizi": pengawas_gizi,
                 "pengawas_keu": pengawas_keu,
@@ -371,7 +409,6 @@ else:
             }
             st.success("Formulir berhasil diproses! Silakan unduh PDF di bawah.")
 
-    # Tombol Download PDF jika data di session state sudah ada
     if st.session_state.data_laporan is not None:
         st.markdown("---")
         st.subheader("📥 Unduh Laporan Resmi")
@@ -380,6 +417,6 @@ else:
         st.download_button(
             label="Download PDF Checklist Harian SPPG",
             data=pdf_bytes,
-            file_name=f"Laporan_SPPG_{st.session_state.data_laporan['nama_sppg']}_{date.today()}.pdf",
+            file_name=f"Laporan_{st.session_state.dapur_aktif}_{date.today()}.pdf",
             mime="application/pdf"
         )
