@@ -2,6 +2,7 @@ import streamlit as st
 from supabase import create_client, Client
 from fpdf import FPDF
 from datetime import date, time
+import base64
 
 st.set_page_config(page_title="Checklist Harian SPPG Nasional", layout="wide")
 
@@ -40,7 +41,6 @@ def get_sppg_data(nama_sppg):
         response = supabase.table("sppg_accounts").select("*").eq("nama_sppg", nama_sppg).execute()
         if response.data:
             row = response.data[0]
-            # Mengembalikan tuple dengan format yang sama seperti kode lamamu
             return (
                 row.get("id"),
                 row.get("nama_sppg"),
@@ -55,6 +55,39 @@ def get_sppg_data(nama_sppg):
     except Exception as e:
         st.error(f"Gagal mengambil detail SPPG: {e}")
     return None
+
+# ==========================================
+# KELAS GENERATOR PDF LAPORAN
+# ==========================================
+class PDFReport(FPDF):
+    def header(self):
+        self.set_font("Arial", "B", 12)
+        self.cell(0, 8, "LAPORAN CHECKLIST HARIAN OPERASIONAL SPPG", 0, 1, "C")
+        self.set_font("Arial", "", 9)
+        self.cell(0, 5, "Badan Gizi Nasional - Program Pemenuhan Gizi Nasional", 0, 1, "C")
+        self.ln(5)
+
+    def footer(self):
+        self.set_y(-15)
+        self.set_font("Arial", "I", 8)
+        self.cell(0, 10, f"Halaman {self.page_no()} | Dicetak otomatis via Sistem Cloud SPPG", 0, 0, "C")
+
+def generate_pdf(data_lap):
+    pdf = PDFReport()
+    pdf.add_page()
+    pdf.set_font("Arial", "", 10)
+
+    # Info Umum
+    pdf.set_font("Arial", "B", 10)
+    pdf.cell(0, 6, "I. IDENTITAS & DATA UMUM", 0, 1, "L")
+    pdf.set_font("Arial", "", 10)
+    
+    for key, val in data_lap.items():
+        pdf.cell(60, 6, f"- {key}:", 0, 0)
+        pdf.cell(0, 6, f"{val}", 0, 1)
+
+    pdf.ln(5)
+    return pdf.output(dest="S").encode("latin1")
 
 # ==========================================
 # HALAMAN LOGIN / OTENTIKASI
@@ -257,5 +290,28 @@ else:
                     olah_sop = st.radio("Tata laksana pengolahan sesuai SOP?", ["Ya", "Tidak"], index=0, horizontal=True)
 
                     submitted_checklist = st.form_submit_button("Proses & Generate Laporan", type="primary")
+
                     if submitted_checklist:
-                        st.success("Formulir berhasil diproses!")
+                        st.session_state.data_laporan = {
+                            "Nama SPPG": db_nama,
+                            "Kepala SPPG": db_kepala,
+                            "Tanggal": str(tanggal),
+                            "Jumlah PM Didik": pm_didik_hari_ini,
+                            "Jumlah PM 3B": pm_3b_hari_ini,
+                            "Sertifikat SLHS": sertif_slhs,
+                            "Sertifikat Halal": sertif_halal
+                        }
+                        st.success("Formulir checklist harian berhasil diproses dan disimpan!")
+
+            # Tombol Download PDF di luar form agar langsung responsif
+            if "data_laporan" in st.session_state:
+                st.markdown("---")
+                st.subheader("📥 Unduh Laporan PDF")
+                pdf_bytes = generate_pdf(st.session_state.data_laporan)
+                st.download_button(
+                    label="Download Laporan PDF",
+                    data=pdf_bytes,
+                    file_name=f"Laporan_SPPG_{pilih_sppg_aktif}_{date.today()}.pdf",
+                    mime="application/pdf",
+                    type="primary"
+                )
