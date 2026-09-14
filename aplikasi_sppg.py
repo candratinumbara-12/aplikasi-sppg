@@ -53,8 +53,8 @@ def generate_pdf(d):
     row_h = 6
     
     identitas_rows = [
-        ("Nama SPPG: " + str(d.get("nama_sppg")), "Pengawas Keu: " + str(d.get("pengawas_keu", "-"))),
-        ("Kepala SPPG: " + str(d.get("kepala_sppg")), "Pengawas Gizi: " + str(d.get("pengawas_gizi"))),
+        ("Nama SPPG: " + str(d.get("nama_sppg")), "Pengawas Keu (PLOK): " + str(d.get("pengawas_keu", "-"))),
+        ("Kepala SPPG: " + str(d.get("kepala_sppg")), "Pengawas Gizi (Plog): " + str(d.get("pengawas_gizi"))),
         ("Tanggal: " + str(d.get("tanggal")), "Asisten Lapangan: " + str(d.get("asisten_lapangan", "-"))),
         ("Jam Mulai Zoom: " + str(d.get("jam_zoom")), "Chef: " + str(d.get("chef", "-")))
     ]
@@ -75,7 +75,7 @@ def generate_pdf(d):
     add_section_header("I. DATA UMUM")
     pdf.cell(0, 5, "  Jumlah Penerima Manfaat (PM):", 0, 1, "L")
     pdf.cell(0, 5, f"    - Peserta Didik: {d.get('pm_didik')} dilayani", 0, 1, "L")
-    pdf.cell(0, 5, f"    - Ibu Hamil/Menyusui/Balita: {d.get('pm_3b')} dilayani", 0, 1, "L")
+    pdf.cell(0, 5, f"    - Ibu Hamil/Menyusui/Balita (B3): {d.get('pm_3b')} dilayani", 0, 1, "L")
     
     pdf.cell(0, 5, "  Sertifikasi:", 0, 1, "L")
     pdf.cell(0, 5, f"    - SLHS: {d.get('sertif_slhs')}", 0, 1, "L")
@@ -153,270 +153,357 @@ def generate_pdf(d):
 
 
 # ==========================================
-# 2. INISIALISASI SESSION STATE
+# 2. INISIALISASI SESSION STATE & DATABASE LOKAL
 # ==========================================
+if "db_akun" not in st.session_state:
+    # Database sementara di memory (bisa nanti di-sync ke Supabase tabel 'sppg_accounts')
+    # Format: {"id_dapur": {"password": "...", "nama_sppg": "..."}}
+    st.session_state.db_akun = {
+        "sppg01": {"password": "123", "nama_sppg": "SPPG Paseh Cigentur"}
+    }
+
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
-if "current_user" not in st.session_state:
-    st.session_state.current_user = ""
-if "current_password" not in st.session_state:
-    st.session_state.current_password = "password123"  # Password default sementara untuk demo
+if "current_id_dapur" not in st.session_state:
+    st.session_state.current_id_dapur = ""
 if "dapur_aktif" not in st.session_state:
     st.session_state.dapur_aktif = ""
+
+# Data Awal Tim & PM yang diminta setelah login
+if "setup_selesai" not in st.session_state:
+    st.session_state.setup_selesai = False
+if "profile_tim" not in st.session_state:
+    st.session_state.profile_tim = {
+        "kepala_sppg": "Candra Tinumbara",
+        "plok": "Cintia Rinawati",
+        "plog": "Priska Grace",
+        "chef": "Davi Agus Nugraha",
+        "asisten_lapangan": "-",
+        "pm_didik": 3000,
+        "pm_3b": 150
+    }
+
 if "data_laporan" not in st.session_state:
     st.session_state.data_laporan = None
 
 
 # ==========================================
-# 3. HALAMAN LOGIN
+# 3. NAVIGASI AWAL: LOGIN / REGISTRASI
 # ==========================================
 if not st.session_state.logged_in:
-    st.title("🔐 Login Khusus Dapur SPPG")
-    st.markdown("Badan Gizi Nasional - Masukkan kredensial dapur Anda")
+    st.title("🍲 Portal Sistem Operasional SPPG")
+    st.markdown("Badan Gizi Nasional - Silakan Masuk atau Registrasi Dapur Baru")
     
-    with st.form("form_login"):
-        username = st.text_input("Username / ID Dapur")
-        password = st.text_input("Password", type="password")
-        submit_login = st.form_submit_button("Masuk Sistem")
-        
-        if submit_login:
-            if username and password:
-                # Jika ingin menggunakan database tabel 'users' supabase, pengecekan bisa dilakukan di sini.
-                # Untuk saat ini kita validasi sesi/default
-                st.session_state.logged_in = True
-                st.session_state.current_user = username
-                st.session_state.dapur_aktif = f"SPPG {username.upper()}"
-                st.success("Login berhasil!")
-                st.rerun()
-            else:
-                st.error("Mohon isi username dan password!")
-                
+    menu_auth = st.tabs(["🔑 Login ID Dapur", "📝 Registrasi Dapur Baru"])
+    
+    # --- TAB LOGIN ---
+    with menu_auth[0]:
+        st.sub = st.subheader("Login Menggunakan ID SPPG")
+        with st.form("form_login"):
+            input_id = st.text_input("ID Dapur (contoh: sppg01)")
+            input_pass = st.text_input("Password", type="password")
+            submit_login = st.form_submit_button("Masuk Sistem")
+            
+            if submit_login:
+                clean_id = input_id.strip().lower()
+                if clean_id in st.session_state.db_akun:
+                    if st.session_state.db_akun[clean_id]["password"] == input_pass:
+                        st.session_state.logged_in = True
+                        st.session_state.current_id_dapur = clean_id
+                        st.session_state.dapur_aktif = st.session_state.db_akun[clean_id]["nama_sppg"]
+                        st.success("Login berhasil!")
+                        st.rerun()
+                    else:
+                        st.error("Password salah!")
+                else:
+                    st.error("ID Dapur tidak ditemukan! Silakan registrasi terlebih dahulu.")
+
+    # --- TAB REGISTRASI ---
+    with menu_auth[1]:
+        st.subheader("Pendaftaran Akun Dapur SPPG Baru")
+        with st.form("form_registrasi"):
+            reg_nama_sppg = st.text_input("Nama SPPG (Contoh: SPPG Paseh Cigentur)")
+            reg_id_dapur = st.text_input("Buat ID Dapur Unik (Contoh: paseh01)")
+            reg_pass = st.text_input("Buat Password", type="password")
+            reg_pass_konfirm = st.text_input("Konfirmasi Password", type="password")
+            submit_reg = st.form_submit_button("Daftarkan Dapur")
+            
+            if submit_reg:
+                clean_reg_id = reg_id_dapur.strip().lower()
+                if not reg_nama_sppg or not clean_reg_id or not reg_pass:
+                    st.error("Semua kolom wajib diisi!")
+                elif reg_pass != reg_pass_konfirm:
+                    st.error("Konfirmasi password tidak cocok!")
+                elif clean_reg_id in st.session_state.db_akun:
+                    st.error("ID Dapur tersebut sudah terdaftar! Gunakan ID lain.")
+                else:
+                    # Simpan ke database lokal (bisa diintegrasikan ke Supabase .insert())
+                    st.session_state.db_akun[clean_reg_id] = {
+                        "password": reg_pass,
+                        "nama_sppg": reg_nama_sppg
+                    }
+                    st.success("Registrasi berhasil! Silakan pindah ke tab 'Login ID Dapur' untuk masuk.")
+
 else:
     # ==========================================
-    # 4. HALAMAN UTAMA (ISOLASI PER AKUN/DAPUR)
+    # 4. WIZARD: PENGISIAN DATA AWAL (SETELAH LOGIN)
     # ==========================================
-    st.sidebar.title("⚙️ Panel Kontrol Dapur")
-    st.sidebar.info(f"Dapur Aktif:\n**{st.session_state.dapur_aktif}**\n\nUser: `{st.session_state.current_user}`")
-    
-    # Fitur Pengaturan Nama Dapur
-    with st.sidebar.expander("Pengaturan Nama Dapur"):
-        ubah_nama_dapur = st.text_input("Perbarui Nama Dapur", value=st.session_state.dapur_aktif)
-        if st.button("Simpan Nama Dapur"):
-            if ubah_nama_dapur:
-                st.session_state.dapur_aktif = ubah_nama_dapur
-                st.sidebar.success("Nama dapur berhasil diperbarui!")
+    if not st.session_state.setup_selesai:
+        st.title(f"🛠️ Setup Data Awal Dapur: {st.session_state.dapur_aktif}")
+        st.info("Sebelum masuk ke sistem harian, mohon lengkapi data identitas tim dan jumlah sasaran penerima manfaat (PM) untuk dapur Anda.")
+        
+        with st.form("form_setup_awal"):
+            c1, c2 = st.columns(2)
+            with c1:
+                s_kepala = st.text_input("Nama Kepala SPPG", value=st.session_state.profile_tim["kepala_sppg"])
+                s_plok = st.text_input("Pengawas Keuangan (PLOK)", value=st.session_state.profile_tim["plok"])
+                s_plog = st.text_input("Pengawas Gizi (Plog)", value=st.session_state.profile_tim["plog"])
+            with c2:
+                s_chef = st.text_input("Chef", value=st.session_state.profile_tim["chef"])
+                s_asisten = st.text_input("Asisten Lapangan", value=st.session_state.profile_tim["asisten_lapangan"])
+                s_pm_didik = st.number_input("Jumlah Penerima Manfaat (PM) Siswa", value=st.session_state.profile_tim["pm_didik"])
+                s_pm_3b = st.number_input("Jumlah Penerima Manfaat (PM) B3 (Ibu Hamil/Balita)", value=st.session_state.profile_tim["pm_3b"])
+            
+            submit_setup = st.form_submit_button("Simpan & Masuk ke Sistem Utama")
+            
+            if submit_setup:
+                st.session_state.profile_tim = {
+                    "kepala_sppg": s_kepala,
+                    "plok": s_plok,
+                    "plog": s_plog,
+                    "chef": s_chef,
+                    "asisten_lapangan": s_asisten,
+                    "pm_didik": s_pm_didik,
+                    "pm_3b": s_pm_3b
+                }
+                st.session_state.setup_selesai = True
+                st.success("Data awal berhasil disimpan!")
                 st.rerun()
 
-    # ** FITUR BARU: UBAH PASSWORD **
-    with st.sidebar.expander("🔑 Ubah Password"):
-        with st.form("form_ubah_password"):
-            pass_lama = st.text_input("Password Lama", type="password")
-            pass_baru = st.text_input("Password Baru", type="password")
-            konfirmasi_pass = st.text_input("Konfirmasi Password Baru", type="password")
-            submit_pass = st.form_submit_button("Perbarui Password")
+    else:
+        # ==========================================
+        # 5. HALAMAN UTAMA OPERASIONAL SPPG
+        # ==========================================
+        st.sidebar.title("⚙️ Panel Kontrol Dapur")
+        st.sidebar.info(f"Dapur: **{st.session_state.dapur_aktif}**\nID: `{st.session_state.current_id_dapur}`")
+        
+        # Tombol Ubah Data Awal Tim / PM
+        if st.sidebar.button("✏️ Ubah Data Awal / Tim"):
+            st.session_state.setup_selesai = False
+            st.rerun()
+
+        # Fitur Ubah Password
+        with st.sidebar.expander("🔑 Ubah Password"):
+            with st.form("form_ubah_password"):
+                pass_lama = st.text_input("Password Lama", type="password")
+                pass_baru = st.text_input("Password Baru", type="password")
+                konfirmasi_pass = st.text_input("Konfirmasi Password Baru", type="password")
+                submit_pass = st.form_submit_button("Perbarui Password")
+                
+                if submit_pass:
+                    current_id = st.session_state.current_id_dapur
+                    if not pass_lama or not pass_baru or not konfirmasi_pass:
+                        st.error("Semua kolom wajib diisi!")
+                    elif pass_baru != konfirmasi_pass:
+                        st.error("Konfirmasi password baru tidak cocok!")
+                    elif st.session_state.db_akun[current_id]["password"] != pass_lama:
+                        st.error("Password lama salah!")
+                    else:
+                        st.session_state.db_akun[current_id]["password"] = pass_baru
+                        st.success("Password berhasil diubah!")
+
+        if st.sidebar.button("Keluar (Logout)"):
+            st.session_state.logged_in = False
+            st.session_state.current_id_dapur = ""
+            st.session_state.dapur_aktif = ""
+            st.session_state.setup_selesai = False
+            st.session_state.data_laporan = None
+            st.rerun()
+
+        st.title(f"🍲 Sistem Cloud Pengawasan Operasional - {st.session_state.dapur_aktif}")
+        st.markdown("Badan Gizi Nasional - Program Pemenuhan Gizi Nasional")
+
+        with st.form("form_checklist_sppg"):
+            st.subheader("Formulir Checklist Harian & Koordinasi Zoom")
             
-            if submit_pass:
-                # Validasi sederhana password lama & baru
-                if not pass_lama or not pass_baru or not konfirmasi_pass:
-                    st.error("Semua kolom wajib diisi!")
-                elif pass_baru != konfirmasi_pass:
-                    st.error("Konfirmasi password baru tidak cocok!")
-                else:
-                    # Di sini Anda bisa menyambungkan update ke database Supabase jika tabel user sudah ada
-                    # Contoh: supabase.table("users").update({"password": pass_baru}).eq("username", st.session_state.current_user).execute()
-                    st.session_state.current_password = pass_baru
-                    st.success("Password berhasil diubah!")
+            # Data otomatis ditarik dari setup awal (bisa dilihat/ditinjau ulang)
+            col1, col2 = st.columns(2)
+            with col1:
+                db_nama = st.text_input("Nama SPPG", st.session_state.dapur_aktif, disabled=True)
+                db_kepala = st.text_input("Kepala SPPG", st.session_state.profile_tim["kepala_sppg"])
+                tanggal = st.date_input("Tanggal Checklist", date.today())
+                jam_zoom = st.time_input("Jam Mulai Zoom", time(14, 0))
+                pengawas_gizi = st.text_input("Pengawas Gizi (Plog)", st.session_state.profile_tim["plog"])
+                chef = st.text_input("Chef", st.session_state.profile_tim["chef"])
+            
+            with col2:
+                pengawas_keu = st.text_input("Pengawas Keuangan (PLOK)", st.session_state.profile_tim["plok"])
+                asisten_lapangan = st.text_input("Asisten Lapangan", st.session_state.profile_tim["asisten_lapangan"])
+                pm_didik_hari_ini = st.number_input("Jumlah Peserta Didik Dilayani", value=st.session_state.profile_tim["pm_didik"])
+                pm_3b_hari_ini = st.number_input("Jumlah PM B3 (Ibu Hamil/Balita) Dilayani", value=st.session_state.profile_tim["pm_3b"])
 
-    if st.sidebar.button("Keluar (Logout)"):
-        st.session_state.logged_in = False
-        st.session_state.current_user = ""
-        st.session_state.dapur_aktif = ""
-        st.session_state.data_laporan = None
-        st.rerun()
+            st.markdown("---")
+            st.markdown("### I. Data Umum & Sertifikasi")
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                sertif_slhs = st.selectbox("Sertifikat SLHS", ["Ya", "Tidak"], index=0)
+                sumber_air_minum = st.text_input("Sumber Air Minum", "PDAM")
+                ph_minum = st.text_input("pH Air Minum", "7.0 (Sesuai Standar)")
+            with c2:
+                sertif_halal = st.selectbox("Sertifikat Halal", ["Ya", "Tidak"], index=0)
+                sumber_air_masak = st.text_input("Sumber Air Masak", "PDAM")
+                ph_masak = st.text_input("pH Air Masak", "7.0 (Sesuai Standar)")
+            with c3:
+                sertif_bnsp = st.selectbox("Sertifikat BNSP Chef", ["Ya", "Tidak"], index=0)
+                ruang_termo = st.selectbox("Termometer tersedia", ["Ya", "Tidak"], index=0)
+                ruang_suhu = st.selectbox("Suhu sesuai standar", ["Ya", "Tidak"], index=0)
+                suhu_ruang = st.text_input("Suhu Ruangan (°C)", "26")
+                ruang_bersih = st.selectbox("Ruangan bersih", ["Ya", "Tidak"], index=0)
+                insect_killer = st.selectbox("Insect killer berfungsi", ["Ya", "Tidak"], index=0)
 
-    st.title(f"🍲 Sistem Cloud Pengawasan Operasional - {st.session_state.dapur_aktif}")
-    st.markdown("Badan Gizi Nasional - Program Pemenuhan Gizi Nasional")
+            st.markdown("---")
+            st.markdown("### II. Penerimaan Bahan Baku")
+            p1, p2, p3, p4, p5 = st.columns(5)
+            with p1:
+                jam_terima_karbo = st.text_input("Jam Karbo", "05:30")
+                karbo = st.selectbox("Stok Karbo", ["Sesuai", "Tidak"], index=0)
+            with p2:
+                jam_terima_prohe = st.text_input("Jam Prohe", "05:30")
+                prohe = st.selectbox("Stok Prohe", ["Sesuai", "Tidak"], index=0)
+            with p3:
+                jam_terima_prona = st.text_input("Jam Prona", "05:30")
+                prona = st.selectbox("Stok Prona", ["Sesuai", "Tidak"], index=0)
+            with p4:
+                jam_terima_sayur = st.text_input("Jam Sayur", "05:30")
+                sayur = st.selectbox("Stok Sayur", ["Sesuai", "Tidak"], index=0)
+            with p5:
+                jam_terima_buah = st.text_input("Jam Buah", "05:30")
+                buah = st.selectbox("Stok Buah", ["Sesuai", "Tidak"], index=0)
 
-    with st.form("form_checklist_sppg"):
-        st.subheader("Formulir Checklist Harian & Koordinasi Zoom")
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            db_nama = st.text_input("Nama SPPG", st.session_state.dapur_aktif, disabled=True)
-            db_kepala = st.text_input("Kepala SPPG", "Candra Tinumbara")
-            tanggal = st.date_input("Tanggal Checklist", date.today())
-            jam_zoom = st.time_input("Jam Mulai Zoom", time(14, 0))
-            pengawas_gizi = st.text_input("Pengawas Gizi", "Priska Grace")
-            chef = st.text_input("Chef", "Davi Agus Nugraha")
-        
-        with col2:
-            pengawas_keu = st.text_input("Pengawas Keuangan", "Cintia Rinawati")
-            asisten_lapangan = st.text_input("Asisten Lapangan", "-")
-            pm_didik_hari_ini = st.number_input("Jumlah Peserta Didik Dilayani", value=3000)
-            pm_3b_hari_ini = st.number_input("Jumlah PM 3B (Ibu Hamil/Balita) Dilayani", value=150)
+            st.markdown("---")
+            st.markdown("### III. Persiapan, Pengolahan & Pendinginan")
+            o1, o2, o3 = st.columns(3)
+            with o1:
+                hig_sakit = st.selectbox("Tim sakit / demam / batuk", ["Tidak Ada", "Ada"], index=0)
+                apd_pakai = st.selectbox("Penggunaan APD lengkap", ["Ya", "Tidak"], index=0)
+            with o2:
+                hig_ctps = st.selectbox("Cuci Tangan Pakai Sabun (CTPS)", ["Ya", "Tidak"], index=0)
+                menu_rawan = st.text_input("Menu Rawan Hari Ini", "Ikan / Santan")
+            with o3:
+                suhu_matang = st.text_input("Pengecekan Suhu Matang Sempurna", "Ya (>85°C)")
 
-        st.markdown("---")
-        st.markdown("### I. Data Umum & Sertifikasi")
-        c1, c2, c3 = st.columns(3)
-        with c1:
-            sertif_slhs = st.selectbox("Sertifikat SLHS", ["Ya", "Tidak"], index=0)
-            sumber_air_minum = st.text_input("Sumber Air Minum", "PDAM")
-            ph_minum = st.text_input("pH Air Minum", "7.0 (Sesuai Standar)")
-        with c2:
-            sertif_halal = st.selectbox("Sertifikat Halal", ["Ya", "Tidak"], index=0)
-            sumber_air_masak = st.text_input("Sumber Air Masak", "PDAM")
-            ph_masak = st.text_input("pH Air Masak", "7.0 (Sesuai Standar)")
-        with c3:
-            sertif_bnsp = st.selectbox("Sertifikat BNSP Chef", ["Ya", "Tidak"], index=0)
-            ruang_termo = st.selectbox("Termometer tersedia", ["Ya", "Tidak"], index=0)
-            ruang_suhu = st.selectbox("Suhu sesuai standar", ["Ya", "Tidak"], index=0)
-            suhu_ruang = st.text_input("Suhu Ruangan (°C)", "26")
-            ruang_bersih = st.selectbox("Ruangan bersih", ["Ya", "Tidak"], index=0)
-            insect_killer = st.selectbox("Insect killer berfungsi", ["Ya", "Tidak"], index=0)
+            st.markdown("---")
+            st.markdown("### IV. Pengemasan & Distribusi")
+            d1, d2, d3, d4 = st.columns(4)
+            with d1:
+                jam_kemas = st.text_input("Jam Pengemasan", "09:00 - 10:00")
+            with d2:
+                suhu_kemas = st.text_input("Suhu Makanan Saat Dikemas", "65°C")
+            with d3:
+                wadah_pangan = st.selectbox("Wadah Pangan Food Grade", ["Ya", "Tidak"], index=0)
+            with d4:
+                distrib_tepat = st.selectbox("Distribusi Tepat Waktu", ["Ya", "Tidak"], index=0)
 
-        st.markdown("---")
-        st.markdown("### II. Penerimaan Bahan Baku")
-        p1, p2, p3, p4, p5 = st.columns(5)
-        with p1:
-            jam_terima_karbo = st.text_input("Jam Karbo", "05:30")
-            karbo = st.selectbox("Stok Karbo", ["Sesuai", "Tidak"], index=0)
-        with p2:
-            jam_terima_prohe = st.text_input("Jam Prohe", "05:30")
-            prohe = st.selectbox("Stok Prohe", ["Sesuai", "Tidak"], index=0)
-        with p3:
-            jam_terima_prona = st.text_input("Jam Prona", "05:30")
-            prona = st.selectbox("Stok Prona", ["Sesuai", "Tidak"], index=0)
-        with p4:
-            jam_terima_sayur = st.text_input("Jam Sayur", "05:30")
-            sayur = st.selectbox("Stok Sayur", ["Sesuai", "Tidak"], index=0)
-        with p5:
-            jam_terima_buah = st.text_input("Jam Buah", "05:30")
-            buah = st.selectbox("Stok Buah", ["Sesuai", "Tidak"], index=0)
+            st.markdown("---")
+            st.markdown("### V. Pengawasan Mutu & Sampel")
+            m1, m2 = st.columns(2)
+            with m1:
+                uji_organoleptik = st.selectbox("Uji Organoleptik (Rasa/Aroma/Warna)", ["Sesuai / Layak", "Tidak Layak"], index=0)
+            with m2:
+                sampel_simpan = st.selectbox("Penyimpanan Food Sample (2x24 Jam)", ["Ya", "Tidak"], index=0)
+                suhu_sampel = st.text_input("Suhu Penyimpanan Sampel", "4°C (Chiller)")
 
-        st.markdown("---")
-        st.markdown("### III. Persiapan, Pengolahan & Pendinginan")
-        o1, o2, o3 = st.columns(3)
-        with o1:
-            hig_sakit = st.selectbox("Tim sakit / demam / batuk", ["Tidak Ada", "Ada"], index=0)
-            apd_pakai = st.selectbox("Penggunaan APD lengkap", ["Ya", "Tidak"], index=0)
-        with o2:
-            hig_ctps = st.selectbox("Cuci Tangan Pakai Sabun (CTPS)", ["Ya", "Tidak"], index=0)
-            menu_rawan = st.text_input("Menu Rawan Hari Ini", "Ikan / Santan")
-        with o3:
-            suhu_matang = st.text_input("Pengecekan Suhu Matang Sempurna", "Ya (>85°C)")
+            st.markdown("---")
+            st.markdown("### VI. Kebersihan Area & Pengelolaan Limbah")
+            k_l1, k_l2 = st.columns(2)
+            with k_l1:
+                dapur_bersih = st.selectbox("Pembersihan & Sanitasi Dapur Total", ["Ya", "Tidak"], index=0)
+            with k_l2:
+                limbah_kelola = st.selectbox("Pengelolaan Limbah & Sampah", ["Terkelola Baik", "Kurang Baik"], index=0)
 
-        st.markdown("---")
-        st.markdown("### IV. Pengemasan & Distribusi")
-        d1, d2, d3, d4 = st.columns(4)
-        with d1:
-            jam_kemas = st.text_input("Jam Pengemasan", "09:00 - 10:00")
-        with d2:
-            suhu_kemas = st.text_input("Suhu Makanan Saat Dikemas", "65°C")
-        with d3:
-            wadah_pangan = st.selectbox("Wadah Pangan Food Grade", ["Ya", "Tidak"], index=0)
-        with d4:
-            distrib_tepat = st.selectbox("Distribusi Tepat Waktu", ["Ya", "Tidak"], index=0)
+            st.markdown("---")
+            st.markdown("### VII. Evaluasi Sisa Makanan (Plate Waste) & Catatan")
+            s_m1, s_m2, s_m3, s_m4, s_m5 = st.columns(5)
+            with s_m1:
+                sisa_nasi_gram = st.text_input("Sisa Nasi", "50 gram")
+            with s_m2:
+                sisa_prohe_gram = st.text_input("Sisa Prohe", "20 gram")
+            with s_m3:
+                sisa_prona_gram = st.text_input("Sisa Prona", "10 gram")
+            with s_m4:
+                sisa_sayur_gram = st.text_input("Sisa Sayur", "30 gram")
+            with s_m5:
+                sisa_buah_gram = st.text_input("Sisa Buah", "15 gram")
 
-        st.markdown("---")
-        st.markdown("### V. Pengawasan Mutu & Sampel")
-        m1, m2 = st.columns(2)
-        with m1:
-            uji_organoleptik = st.selectbox("Uji Organoleptik (Rasa/Aroma/Warna)", ["Sesuai / Layak", "Tidak Layak"], index=0)
-        with m2:
-            sampel_simpan = st.selectbox("Penyimpanan Food Sample (2x24 Jam)", ["Ya", "Tidak"], index=0)
-            suhu_sampel = st.text_input("Suhu Penyimpanan Sampel", "4°C (Chiller)")
+            catatan_khusus = st.text_area("Catatan / Kendala Operasional", "Semua proses operasional berjalan lancar sesuai standar protokol kesehatan Badan Gizi Nasional.")
 
-        st.markdown("---")
-        st.markdown("### VI. Kebersihan Area & Pengelolaan Limbah")
-        k_l1, k_l2 = st.columns(2)
-        with k_l1:
-            dapur_bersih = st.selectbox("Pembersihan & Sanitasi Dapur Total", ["Ya", "Tidak"], index=0)
-        with k_l2:
-            limbah_kelola = st.selectbox("Pengelolaan Limbah & Sampah", ["Terkelola Baik", "Kurang Baik"], index=0)
+            submitted_checklist = st.form_submit_button("💾 Proses & Siapkan Laporan PDF")
 
-        st.markdown("---")
-        st.markdown("### VII. Evaluasi Sisa Makanan (Plate Waste) & Catatan")
-        s_m1, s_m2, s_m3, s_m4, s_m5 = st.columns(5)
-        with s_m1:
-            sisa_nasi_gram = st.text_input("Sisa Nasi", "50 gram")
-        with s_m2:
-            sisa_prohe_gram = st.text_input("Sisa Prohe", "20 gram")
-        with s_m3:
-            sisa_prona_gram = st.text_input("Sisa Prona", "10 gram")
-        with s_m4:
-            sisa_sayur_gram = st.text_input("Sisa Sayur", "30 gram")
-        with s_m5:
-            sisa_buah_gram = st.text_input("Sisa Buah", "15 gram")
+            if submitted_checklist:
+                st.session_state.data_laporan = {
+                    "nama_sppg": st.session_state.dapur_aktif,
+                    "kepala_sppg": db_kepala,
+                    "pengawas_gizi": pengawas_gizi,
+                    "pengawas_keu": pengawas_keu,
+                    "asisten_lapangan": asisten_lapangan,
+                    "chef": chef,
+                    "tanggal": str(tanggal),
+                    "jam_zoom": str(jam_zoom),
+                    "pm_didik": pm_didik_hari_ini,
+                    "pm_3b": pm_3b_hari_ini,
+                    "sertif_slhs": sertif_slhs,
+                    "sertif_halal": sertif_halal,
+                    "sertif_bnsp": sertif_bnsp,
+                    "sumber_air_minum": sumber_air_minum,
+                    "ph_minum": ph_minum,
+                    "sumber_air_masak": sumber_air_masak,
+                    "ph_masak": ph_masak,
+                    "ruang_termo": ruang_termo,
+                    "ruang_suhu": ruang_suhu,
+                    "suhu_ruang": suhu_ruang,
+                    "ruang_bersih": ruang_bersih,
+                    "insect_killer": insect_killer,
+                    "t_karbo": jam_terima_karbo,
+                    "t_prohe": jam_terima_prohe,
+                    "t_prona": jam_terima_prona,
+                    "t_sayur": jam_terima_sayur,
+                    "t_buah": jam_terima_buah,
+                    "k_karbo": karbo,
+                    "k_prohe": prohe,
+                    "k_prona": prona,
+                    "k_sayur": sayur,
+                    "k_buah": buah,
+                    "hig_sakit": hig_sakit,
+                    "apd_pakai": apd_pakai,
+                    "hig_ctps": hig_ctps,
+                    "menu_rawan": menu_rawan,
+                    "suhu_matang": suhu_matang,
+                    "jam_kemas": jam_kemas,
+                    "suhu_kemas": suhu_kemas,
+                    "wadah_pangan": wadah_pangan,
+                    "distrib_tepat": distrib_tepat,
+                    "uji_organoleptik": uji_organoleptik,
+                    "sampel_simpan": sampel_simpan,
+                    "suhu_sampel": suhu_sampel,
+                    "dapur_bersih": dapur_bersih,
+                    "limbah_kelola": limbah_kelola,
+                    "sisa_nasi": sisa_nasi_gram,
+                    "sisa_prohe": sisa_prohe_gram,
+                    "sisa_prona": sisa_prona_gram,
+                    "sisa_sayur": sisa_sayur_gram,
+                    "sisa_buah": sisa_buah_gram,
+                    "catatan": catatan_khusus
+                }
+                st.success("Formulir berhasil diproses! Silakan unduh PDF di bawah.")
 
-        catatan_khusus = st.text_area("Catatan / Kendala Operasional", "Semua proses operasional berjalan lancar sesuai standar protokol kesehatan Badan Gizi Nasional.")
-
-        submitted_checklist = st.form_submit_button("💾 Proses & Siapkan Laporan PDF")
-
-        if submitted_checklist:
-            st.session_state.data_laporan = {
-                "nama_sppg": st.session_state.dapur_aktif,
-                "kepala_sppg": db_kepala,
-                "pengawas_gizi": pengawas_gizi,
-                "pengawas_keu": pengawas_keu,
-                "asisten_lapangan": asisten_lapangan,
-                "chef": chef,
-                "tanggal": str(tanggal),
-                "jam_zoom": str(jam_zoom),
-                "pm_didik": pm_didik_hari_ini,
-                "pm_3b": pm_3b_hari_ini,
-                "sertif_slhs": sertif_slhs,
-                "sertif_halal": sertif_halal,
-                "sertif_bnsp": sertif_bnsp,
-                "sumber_air_minum": sumber_air_minum,
-                "ph_minum": ph_minum,
-                "sumber_air_masak": sumber_air_masak,
-                "ph_masak": ph_masak,
-                "ruang_termo": ruang_termo,
-                "ruang_suhu": ruang_suhu,
-                "suhu_ruang": suhu_ruang,
-                "ruang_bersih": ruang_bersih,
-                "insect_killer": insect_killer,
-                "t_karbo": jam_terima_karbo,
-                "t_prohe": jam_terima_prohe,
-                "t_prona": jam_terima_prona,
-                "t_sayur": jam_terima_sayur,
-                "t_buah": jam_terima_buah,
-                "k_karbo": karbo,
-                "k_prohe": prohe,
-                "k_prona": prona,
-                "k_sayur": sayur,
-                "k_buah": buah,
-                "hig_sakit": hig_sakit,
-                "apd_pakai": apd_pakai,
-                "hig_ctps": hig_ctps,
-                "menu_rawan": menu_rawan,
-                "suhu_matang": suhu_matang,
-                "jam_kemas": jam_kemas,
-                "suhu_kemas": suhu_kemas,
-                "wadah_pangan": wadah_pangan,
-                "distrib_tepat": distrib_tepat,
-                "uji_organoleptik": uji_organoleptik,
-                "sampel_simpan": sampel_simpan,
-                "suhu_sampel": suhu_sampel,
-                "dapur_bersih": dapur_bersih,
-                "limbah_kelola": limbah_kelola,
-                "sisa_nasi": sisa_nasi_gram,
-                "sisa_prohe": sisa_prohe_gram,
-                "sisa_prona": sisa_prona_gram,
-                "sisa_sayur": sisa_sayur_gram,
-                "sisa_buah": sisa_buah_gram,
-                "catatan": catatan_khusus
-            }
-            st.success("Formulir berhasil diproses! Silakan unduh PDF di bawah.")
-
-    if st.session_state.data_laporan is not None:
-        st.markdown("---")
-        st.subheader("📥 Unduh Laporan Resmi")
-        pdf_bytes = generate_pdf(st.session_state.data_laporan)
-        
-        st.download_button(
-            label="Download PDF Checklist Harian SPPG",
-            data=pdf_bytes,
-            file_name=f"Laporan_{st.session_state.dapur_aktif}_{date.today()}.pdf",
-            mime="application/pdf"
-        )
+        if st.session_state.data_laporan is not None:
+            st.markdown("---")
+            st.subheader("📥 Unduh Laporan Resmi")
+            pdf_bytes = generate_pdf(st.session_state.data_laporan)
+            
+            st.download_button(
+                label="Download PDF Checklist Harian SPPG",
+                data=pdf_bytes,
+                file_name=f"Laporan_{st.session_state.dapur_aktif}_{date.today()}.pdf",
+                mime="application/pdf"
+            )
