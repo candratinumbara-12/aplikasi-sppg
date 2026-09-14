@@ -187,7 +187,7 @@ else:
                 db_id, db_nama, db_kepala, db_gizi, db_keu, db_asisten, db_chef, db_pm_didik, db_pm_3b = data_db
 
                 st.markdown(f"<h2 style='text-align: center; background-color: #002B5B; color: white; padding: 10px;'>CHECKLIST HARIAN - {db_nama.upper()}</h2>", unsafe_allow_html=True)
-                st.write(f"Form checklist harian lengkap dengan evaluasi sisa makanan untuk **{db_nama}**.")
+                st.write(f"Form checklist harian lengkap dengan pencatatan sisa makanan (gram) untuk **{db_nama}**.")
 
                 with st.form("form_sppg_full_all"):
                     col1, col2 = st.columns(2)
@@ -316,11 +316,19 @@ else:
 
                     st.markdown("---")
 
-                    # VII. EVALUASI SISA MAKANAN (PLATE WASTE) & CATATAN
+                    # VII. EVALUASI SISA MAKANAN (DALAM GRAM) & CATATAN
                     st.subheader("VII. EVALUASI SISA MAKANAN (PLATE WASTE) & CATATAN KHUSUS")
-                    sisa_karbo = st.slider("Persentase Sisa Makanan Karbohidrat:", 0, 100, 5)
-                    sisa_prohe = st.slider("Persentase Sisa Makanan Protein Hewani:", 0, 100, 5)
-                    sisa_sayur = st.slider("Persentase Sisa Makanan Sayuran:", 0, 100, 10)
+                    st.write("Masukkan estimasi total berat sisa makanan (dalam satuan gram) dari penerima manfaat hari ini:")
+                    
+                    sc1, sc2 = st.columns(2)
+                    with sc1:
+                        sisa_nasi_gram = st.text_input("Sisa Nasi / Karbohidrat (gram):", value="0 gram")
+                        sisa_prohe_gram = st.text_input("Sisa Protein Hewani (gram):", value="0 gram")
+                        sisa_prona_gram = st.text_input("Sisa Protein Nabati (gram):", value="0 gram")
+                    with sc2:
+                        sisa_sayur_gram = st.text_input("Sisa Sayuran (gram):", value="0 gram")
+                        sisa_buah_gram = st.text_input("Sisa Buah (gram):", value="0 gram")
+
                     catatan_khusus = st.text_area("Catatan Kendala / Evaluasi Operasional Hari Ini:", placeholder="Tuliskan catatan penting operasional dapur hari ini jika ada...")
 
                     submitted_checklist = st.form_submit_button("Proses & Generate Laporan", type="primary")
@@ -333,11 +341,14 @@ else:
                             "Tanggal": str(tanggal),
                             "Jumlah PM Didik": pm_didik_hari_ini,
                             "Jumlah PM 3B": pm_3b_hari_ini,
-                            "Rata-rata Sisa Karbo": f"{sisa_karbo}%",
-                            "Rata-rata Sisa Sayur": f"{sisa_sayur}%",
+                            "Sisa Nasi/Karbo": sisa_nasi_gram,
+                            "Sisa Protein Hewani": sisa_prohe_gram,
+                            "Sisa Protein Nabati": sisa_prona_gram,
+                            "Sisa Sayuran": sisa_sayur_gram,
+                            "Sisa Buah": sisa_buah_gram,
                             "Catatan": catatan_khusus if catatan_khusus else "Aman terkendali"
                         }
-                        st.success("Formulir checklist harian & evaluasi sisa makanan berhasil diproses!")
+                        st.success("Formulir checklist harian & data sisa makanan (gram) berhasil diproses!")
 
             # Tombol Download PDF di luar form agar selalu siap di-klik
             if "data_laporan" in st.session_state:
