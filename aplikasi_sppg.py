@@ -83,7 +83,7 @@ def generate_pdf(data_lap):
     pdf.set_font("Arial", "", 10)
     
     for key, val in data_lap.items():
-        pdf.cell(60, 6, f"- {key}:", 0, 0)
+        pdf.cell(65, 6, f"- {key}:", 0, 0)
         pdf.cell(0, 6, f"{val}", 0, 1)
 
     pdf.ln(5)
@@ -164,12 +164,12 @@ else:
                             "pm_3b": new_pm_3b
                         }
                         supabase.table("sppg_accounts").insert(data_insert).execute()
-                        st.success(f"Akun SPPG '{new_nama_sppg}' berhasil disimpan ke Cloud! Silakan pindah ke menu 'Form Checklist Harian'.")
+                        st.success(f"Akun SPPG '{new_nama_sppg}' berhasil disimpan ke Cloud!")
                     except Exception as e:
-                        st.error(f"Gagal menyimpan akun (Kemungkinan nama SPPG sudah terdaftar): {e}")
+                        st.error(f"Gagal menyimpan akun: {e}")
 
     # ==========================================
-    # HALAMAN 2: FORM CHECKLIST HARIAN LENGKAP
+    # HALAMAN 2: FORM CHECKLIST HARIAN FULL LENGKAP
     # ==========================================
     else:
         daftar_sppg = get_all_sppg_names()
@@ -187,9 +187,9 @@ else:
                 db_id, db_nama, db_kepala, db_gizi, db_keu, db_asisten, db_chef, db_pm_didik, db_pm_3b = data_db
 
                 st.markdown(f"<h2 style='text-align: center; background-color: #002B5B; color: white; padding: 10px;'>CHECKLIST HARIAN - {db_nama.upper()}</h2>", unsafe_allow_html=True)
-                st.write(f"Form checklist harian lengkap untuk **{db_nama}**. Data profil dimuat dari Cloud Supabase.")
+                st.write(f"Form checklist harian lengkap dengan evaluasi sisa makanan untuk **{db_nama}**.")
 
-                with st.form("form_sppg_db_lengkap"):
+                with st.form("form_sppg_full_all"):
                     col1, col2 = st.columns(2)
                     with col1:
                         st.info(f"**Nama SPPG:** {db_nama}\n\n**Kepala SPPG:** {db_kepala}\n\n**Pengawas Gizi:** {db_gizi}")
@@ -230,7 +230,7 @@ else:
 
                     st.markdown("---")
 
-                    # II. PENERIMAAN DAN PENYIMPANAN BAHAN BAKU
+                    # II. PENERIMAAN & PENYIMPANAN BAHAN BAKU
                     st.subheader("II. PENERIMAAN DAN PENYIMPANAN BAHAN BAKU")
                     st.markdown("**1. Waktu Kedatangan Bahan Baku**")
                     w1, w2, w3 = st.columns(3)
@@ -267,7 +267,7 @@ else:
 
                     st.markdown("---")
 
-                    # III. PERSIAPAN, PENGOLAHAN DAN PENDINGINAN
+                    # III. PERSIAPAN & PENGOLAHAN
                     st.subheader("III. PERSIAPAN, PENGOLAHAN DAN PENDINGINAN")
                     st.markdown("**1. Personal Higiene & Persiapan**")
                     hig_sakit = st.radio("Ada tim yang demam, batuk, diare, luka?", ["Ya", "Tidak"], index=1, horizontal=True)
@@ -291,7 +291,7 @@ else:
 
                     st.markdown("---")
 
-                    # IV. PENGEMASAN DAN DISTRIBUSI
+                    # IV. PENGEMASAN & DISTRIBUSI
                     st.subheader("IV. PENGEMASAN DAN DISTRIBUSI")
                     jam_kemas_mulai = st.time_input("Jam Mulai Pengemasan:", value=time(8, 0))
                     jam_kemas_selesai = st.time_input("Jam Selesai Pengemasan:", value=time(10, 0))
@@ -309,10 +309,19 @@ else:
 
                     st.markdown("---")
 
-                    # VI. KEBERSIHAN AREA & PENGELOLAAN LIMBAH
+                    # VI. KEBERSIHAN AREA & LIMBAH
                     st.subheader("VI. KEBERSIHAN AREA & PENGELOLAAN LIMBAH")
                     dapur_bersih_akhir = st.radio("Pembersihan area dapur & peralatan setelah selesai (sanitasi total)?", ["Ya", "Tidak"], index=0, horizontal=True)
                     limbah_kelola = st.radio("Pengelolaan limbah dapur & sampah terkelola dengan baik?", ["Ya", "Tidak"], index=0, horizontal=True)
+
+                    st.markdown("---")
+
+                    # VII. EVALUASI SISA MAKANAN (PLATE WASTE) & CATATAN
+                    st.subheader("VII. EVALUASI SISA MAKANAN (PLATE WASTE) & CATATAN KHUSUS")
+                    sisa_karbo = st.slider("Persentase Sisa Makanan Karbohidrat:", 0, 100, 5)
+                    sisa_prohe = st.slider("Persentase Sisa Makanan Protein Hewani:", 0, 100, 5)
+                    sisa_sayur = st.slider("Persentase Sisa Makanan Sayuran:", 0, 100, 10)
+                    catatan_khusus = st.text_area("Catatan Kendala / Evaluasi Operasional Hari Ini:", placeholder="Tuliskan catatan penting operasional dapur hari ini jika ada...")
 
                     submitted_checklist = st.form_submit_button("Proses & Generate Laporan", type="primary")
 
@@ -324,12 +333,13 @@ else:
                             "Tanggal": str(tanggal),
                             "Jumlah PM Didik": pm_didik_hari_ini,
                             "Jumlah PM 3B": pm_3b_hari_ini,
-                            "Sertifikat SLHS": sertif_slhs,
-                            "Sertifikat Halal": sertif_halal
+                            "Rata-rata Sisa Karbo": f"{sisa_karbo}%",
+                            "Rata-rata Sisa Sayur": f"{sisa_sayur}%",
+                            "Catatan": catatan_khusus if catatan_khusus else "Aman terkendali"
                         }
-                        st.success("Formulir checklist harian berhasil diproses dan disimpan!")
+                        st.success("Formulir checklist harian & evaluasi sisa makanan berhasil diproses!")
 
-            # Tombol Download PDF di luar form
+            # Tombol Download PDF di luar form agar selalu siap di-klik
             if "data_laporan" in st.session_state:
                 st.markdown("---")
                 st.subheader("📥 Unduh Laporan PDF")
