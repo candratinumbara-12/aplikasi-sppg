@@ -169,7 +169,7 @@ else:
                         st.error(f"Gagal menyimpan akun (Kemungkinan nama SPPG sudah terdaftar): {e}")
 
     # ==========================================
-    # HALAMAN 2: FORM CHECKLIST HARIAN
+    # HALAMAN 2: FORM CHECKLIST HARIAN LENGKAP
     # ==========================================
     else:
         daftar_sppg = get_all_sppg_names()
@@ -187,9 +187,9 @@ else:
                 db_id, db_nama, db_kepala, db_gizi, db_keu, db_asisten, db_chef, db_pm_didik, db_pm_3b = data_db
 
                 st.markdown(f"<h2 style='text-align: center; background-color: #002B5B; color: white; padding: 10px;'>CHECKLIST HARIAN - {db_nama.upper()}</h2>", unsafe_allow_html=True)
-                st.write(f"Menampilkan form checklist harian untuk **{db_nama}**. Data profil di bawah otomatis dimuat dari Cloud Supabase.")
+                st.write(f"Form checklist harian lengkap untuk **{db_nama}**. Data profil dimuat dari Cloud Supabase.")
 
-                with st.form("form_sppg_db"):
+                with st.form("form_sppg_db_lengkap"):
                     col1, col2 = st.columns(2)
                     with col1:
                         st.info(f"**Nama SPPG:** {db_nama}\n\n**Kepala SPPG:** {db_kepala}\n\n**Pengawas Gizi:** {db_gizi}")
@@ -289,12 +289,38 @@ else:
                     suhu_matang = st.text_input("Suhu makanan matang tertentu (C & Jam):", value="75 C")
                     olah_sop = st.radio("Tata laksana pengolahan sesuai SOP?", ["Ya", "Tidak"], index=0, horizontal=True)
 
+                    st.markdown("---")
+
+                    # IV. PENGEMASAN DAN DISTRIBUSI
+                    st.subheader("IV. PENGEMASAN DAN DISTRIBUSI")
+                    jam_kemas_mulai = st.time_input("Jam Mulai Pengemasan:", value=time(8, 0))
+                    jam_kemas_selesai = st.time_input("Jam Selesai Pengemasan:", value=time(10, 0))
+                    suhu_kemas = st.text_input("Suhu makanan saat dikemas (C):", value="> 60 C")
+                    wadah_pangan = st.radio("Wadah pangan food grade & tertutup rapat?", ["Ya", "Tidak"], index=0, horizontal=True)
+                    distrib_tepat = st.radio("Distribusi makanan tepat waktu sesuai jadwal?", ["Ya", "Tidak"], index=0, horizontal=True)
+
+                    st.markdown("---")
+
+                    # V. PENGAWASAN MUTU & SAMPEL
+                    st.subheader("V. PENGAWASAN MUTU & SAMPEL")
+                    uji_organoleptik = st.radio("Uji organoleptik (rasa, aroma, warna, tekstur) oleh Pengawas Gizi?", ["Ya", "Tidak"], index=0, horizontal=True)
+                    sampel_simpan = st.radio("Pengambilan & penyimpanan sampel makanan (food sample) 2x24 jam?", ["Ya", "Tidak"], index=0, horizontal=True)
+                    suhu_sampel = st.text_input("Suhu penyimpanan sampel makanan (C):", value="4 C")
+
+                    st.markdown("---")
+
+                    # VI. KEBERSIHAN AREA & PENGELOLAAN LIMBAH
+                    st.subheader("VI. KEBERSIHAN AREA & PENGELOLAAN LIMBAH")
+                    dapur_bersih_akhir = st.radio("Pembersihan area dapur & peralatan setelah selesai (sanitasi total)?", ["Ya", "Tidak"], index=0, horizontal=True)
+                    limbah_kelola = st.radio("Pengelolaan limbah dapur & sampah terkelola dengan baik?", ["Ya", "Tidak"], index=0, horizontal=True)
+
                     submitted_checklist = st.form_submit_button("Proses & Generate Laporan", type="primary")
 
                     if submitted_checklist:
                         st.session_state.data_laporan = {
                             "Nama SPPG": db_nama,
                             "Kepala SPPG": db_kepala,
+                            "Pengawas Gizi": db_gizi,
                             "Tanggal": str(tanggal),
                             "Jumlah PM Didik": pm_didik_hari_ini,
                             "Jumlah PM 3B": pm_3b_hari_ini,
@@ -303,7 +329,7 @@ else:
                         }
                         st.success("Formulir checklist harian berhasil diproses dan disimpan!")
 
-            # Tombol Download PDF di luar form agar langsung responsif
+            # Tombol Download PDF di luar form
             if "data_laporan" in st.session_state:
                 st.markdown("---")
                 st.subheader("📥 Unduh Laporan PDF")
