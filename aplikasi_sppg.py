@@ -1,5 +1,5 @@
 import base64
-from datetime import date
+from datetime import date, time
 import streamlit as st
 from fpdf import FPDF
 
@@ -21,7 +21,7 @@ if "dapur_aktif" not in st.session_state:
     st.session_state.dapur_aktif = "SPPG Paseh Cigentur"
 
 # ==========================================
-# 2. CLASS CLASS PDF & GENERATOR
+# 2. CLASS PDF & GENERATOR
 # ==========================================
 class PDFChecklistResmi(FPDF):
     def header(self):
@@ -399,7 +399,6 @@ def generate_pdf(d):
         "L",
     )
 
-    # Penanganan output kompatibilitas FPDF lama/baru
     out = pdf.output()
     if isinstance(out, str):
         return out.encode("latin1")
@@ -412,7 +411,6 @@ def generate_pdf(d):
 st.title("📋 Sistem Checklist Monitoring & PDF Generator SPPG")
 st.caption("Aplikasi Input Laporan Harian Dapur SPPG - Badan Gizi Nasional")
 
-# Input Nama SPPG
 st.session_state.dapur_aktif = st.text_input(
     "Unit Dapur / SPPG:", value=st.session_state.dapur_aktif
 )
@@ -428,7 +426,8 @@ with st.form("form_presisi_pdf"):
         f_asisten = st.text_input("Asisten Lapangan", "Budi")
         f_chef = st.text_input("Chef", "Dedi")
         f_tanggal = st.date_input("Tanggal Operasional", date.today())
-        f_jam_zoom = st.time_input("Jam Mulai Zoom", date.today())
+        # PERBAIKAN: Menggunakan objek time(07, 00) bukan date.today()
+        f_jam_zoom = st.time_input("Jam Mulai Zoom", time(7, 0))
 
     st.subheader("2. Data Umum & Air Bersih")
     c3, c4 = st.columns(2)
@@ -600,7 +599,6 @@ with st.form("form_presisi_pdf"):
         ["LULUS / LAYAK DISTRIBUSI", "LULUS DENGAN CATATAN", "DITOLAK / TIDAK LAYAK"]
     )
 
-    # Tombol Submit Form
     btn_submit = st.form_submit_button("💾 Proses & Siapkan PDF Resmi")
 
     if btn_submit:
@@ -719,13 +717,11 @@ with st.form("form_presisi_pdf"):
             "keputusan_final": f_keputusan_final,
         }
 
-        # Generate Bytes & Transform ke Data Base64
         pdf_bytes = generate_pdf(data_lap)
         b64_pdf = base64.b64encode(pdf_bytes).decode("utf-8")
 
         filename = f"Checklist_SPPG_{st.session_state.dapur_aktif}_{date.today()}.pdf"
 
-        # Simpan Tag HTML Download ke Session State
         st.session_state.html_download_button = f"""
             <a href="data:application/pdf;base64,{b64_pdf}" download="{filename}" style="
                 display: inline-block;
@@ -753,4 +749,5 @@ if (
 ):
     st.markdown("---")
     st.subheader("📥 Unduh Laporan Resmi PDF")
-    st.markdown(st.session_state.html_download_button, unsafe_allow_allow_html=True)
+    # PERBAIKAN: Menggunakan unsafe_allow_html=True
+    st.markdown(st.session_state.html_download_button, unsafe_allow_html=True)
