@@ -7,12 +7,18 @@ from fpdf import FPDF
 # 1. KONFIGURASI HALAMAN STREAMLIT
 # ==========================================
 st.set_page_config(
-    page_title="Aplikasi SPPG - Checklist Laporan PDF",
+    page_title="Aplikasi SPPG - Sistem Monitoring & PDF",
     page_icon="📋",
     layout="wide",
 )
 
 # Inisialisasi Session State
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+if "user_role" not in st.session_state:
+    st.session_state.user_role = ""
+if "user_name" not in st.session_state:
+    st.session_state.user_name = ""
 if "pdf_data" not in st.session_state:
     st.session_state.pdf_data = None
 if "pdf_filename" not in st.session_state:
@@ -20,49 +26,78 @@ if "pdf_filename" not in st.session_state:
 if "dapur_aktif" not in st.session_state:
     st.session_state.dapur_aktif = "SPPG Paseh Cigentur"
 
+# Database Sederhana User (Skema Login)
+USERS = {
+    "candra": {
+        "password": "123",
+        "role": "Kepala SPPG",
+        "nama": "Candra Tinumbara",
+    },
+    "rina": {"password": "123", "role": "Pengawas Gizi (Plog)", "nama": "Rina"},
+    "asep": {
+        "password": "123",
+        "role": "Pengawas Keuangan (PLOK)",
+        "nama": "Asep",
+    },
+}
+
 # ==========================================
-# 2. CLASS PDF & GENERATOR
+# 2. SEKSI LOGIN
+# ==========================================
+if not st.session_state.logged_in:
+    st.title("🔐 Login Sistem Monitoring SPPG")
+    st.caption("Program Badan Gizi Nasional (BGN)")
+
+    with st.form("form_login"):
+        username_input = st.text_input("Username").strip().lower()
+        password_input = st.text_input("Password", type="password")
+        btn_login = st.form_submit_button("Masuk Sistem")
+
+        if btn_login:
+            if username_input in USERS and USERS[username_input]["password"] == password_input:
+                st.session_state.logged_in = True
+                st.session_state.user_role = USERS[username_input]["role"]
+                st.session_state.user_name = USERS[username_input]["nama"]
+                st.success(f"Login berhasil! Selamat datang, {st.session_state.user_name}")
+                st.rerun()
+            else:
+                st.error("Username atau password salah! Silakan coba lagi.")
+    st.stop()  # Hentikan eksekusi kode di bawah jika belum login
+
+# ==========================================
+# 3. HEADER NAMA USER & TOMBOL LOGOUT
+# ==========================================
+col_head1, col_head2 = st.columns([4, 1])
+with col_head1:
+    st.write(f"👤 **Pengguna:** {st.session_state.user_name} | **Role:** {st.session_state.user_role}")
+with col_head2:
+    if st.button("🚪 Logout"):
+        st.session_state.logged_in = False
+        st.session_state.pdf_data = None
+        st.rerun()
+
+st.markdown("---")
+
+# ==========================================
+# 4. CLASS PDF & GENERATOR (SAFE ENCODING)
 # ==========================================
 class PDFChecklistResmi(FPDF):
     def header(self):
         self.set_font("Arial", "B", 10)
-        self.cell(
-            0,
-            6,
-            "CHECKLIST MONITORING DAN EVALUASI OPERASIONAL SPPG",
-            0,
-            1,
-            "C",
-        )
+        self.cell(0, 6, "CHECKLIST MONITORING DAN EVALUASI OPERASIONAL SPPG", 0, 1, "C")
         self.set_font("Arial", "I", 8)
-        self.cell(
-            0,
-            4,
-            "Program Badan Gizi Nasional (BGN) - Standard Operating Procedure",
-            0,
-            1,
-            "C",
-        )
+        self.cell(0, 4, "Program Badan Gizi Nasional (BGN) - Standard Operating Procedure", 0, 1, "C")
         self.line(10, 20, 200, 20)
         self.ln(5)
 
     def footer(self):
         self.set_y(-15)
         self.set_font("Arial", "I", 8)
-        self.cell(
-            0,
-            10,
-            f"Halaman {self.page_no()}/{{nb}} - Dokumen Resmi Operasional SPPG",
-            0,
-            0,
-            "C",
-        )
-
+        self.cell(0, 10, f"Halaman {self.page_no()}/{{nb}} - Dokumen Resmi Operasional SPPG", 0, 0, "C")
 
 def clean_str(text):
-    """Membersihkan karakter UTF-8 non-latin1 agar FPDF tidak error/corrupt."""
+    """Membersihkan karakter UTF-8 non-latin1 agar FPDF tidak corrupt"""
     return str(text).encode("latin-1", "replace").decode("latin-1")
-
 
 def generate_pdf(d):
     pdf = PDFChecklistResmi()
@@ -76,17 +111,13 @@ def generate_pdf(d):
     # Header Identitas Dapur & Tim
     pdf.set_font("Arial", "B", 8)
     pdf.cell(col_w, row_h, clean_str(f"Nama SPPG: {d.get('nama_sppg')}"), 1, 0, "L")
-    pdf.cell(
-        col_w, row_h, clean_str(f"Pengawas Keuangan (PLOK): {d.get('plok')}"), 1, 1, "L"
-    )
+    pdf.cell(col_w, row_h, clean_str(f"Pengawas Keuangan (PLOK): {d.get('plok')}"), 1, 1, "L")
 
     pdf.cell(col_w, row_h, clean_str(f"Kepala SPPG: {d.get('kepala_sppg')}"), 1, 0, "L")
     pdf.cell(col_w, row_h, clean_str(f"Pengawas Gizi (Plog): {d.get('plog')}"), 1, 1, "L")
 
     pdf.cell(col_w, row_h, clean_str(f"Tanggal: {d.get('tanggal')}"), 1, 0, "L")
-    pdf.cell(
-        col_w, row_h, clean_str(f"Asisten Lapangan: {d.get('asisten_lapangan')}"), 1, 1, "L"
-    )
+    pdf.cell(col_w, row_h, clean_str(f"Asisten Lapangan: {d.get('asisten_lapangan')}"), 1, 1, "L")
 
     pdf.cell(col_w, row_h, clean_str(f"Jam Mulai Zoom: {d.get('jam_zoom')}"), 1, 0, "L")
     pdf.cell(col_w, row_h, clean_str(f"Chef: {d.get('chef')}"), 1, 1, "L")
@@ -101,291 +132,66 @@ def generate_pdf(d):
     # I. DATA UMUM
     print_section("I. DATA UMUM")
     pdf.cell(0, 5, "1. JUMLAH PENERIMA MANFAAT & SERTIFIKASI", 0, 1, "L")
-    pdf.cell(
-        0,
-        4,
-        clean_str(f"   - PM Peserta Didik: Terdata ({d.get('pm_didik_potensi')}) | Dilayani Hari Ini ({d.get('pm_didik_dilayani')})"),
-        0,
-        1,
-        "L",
-    )
-    pdf.cell(
-        0,
-        4,
-        clean_str(f"   - PM 3B (Bumil/Balita): Terdata ({d.get('pm_3b_potensi')}) | Dilayani Hari Ini ({d.get('pm_3b_dilayani')})"),
-        0,
-        1,
-        "L",
-    )
-    pdf.cell(
-        0,
-        4,
-        clean_str(f"   - Total PM Dilayani: {int(d.get('pm_didik_dilayani', 0)) + int(d.get('pm_3b_dilayani', 0))}"),
-        0,
-        1,
-        "L",
-    )
-    pdf.cell(
-        0,
-        4,
-        clean_str(f"   - Sertifikat SLHS: {d.get('sertif_slhs')} | Sertifikat Halal: {d.get('sertif_halal')} | Sertifikat BNSP Chef: {d.get('sertif_bnsp')}"),
-        0,
-        1,
-        "L",
-    )
+    pdf.cell(0, 4, clean_str(f"   - PM Peserta Didik: Terdata ({d.get('pm_didik_potensi')}) | Dilayani Hari Ini ({d.get('pm_didik_dilayani')})"), 0, 1, "L")
+    pdf.cell(0, 4, clean_str(f"   - PM 3B (Bumil/Balita): Terdata ({d.get('pm_3b_potensi')}) | Dilayani Hari Ini ({d.get('pm_3b_dilayani')})"), 0, 1, "L")
+    pdf.cell(0, 4, clean_str(f"   - Total PM Dilayani: {int(d.get('pm_didik_dilayani', 0)) + int(d.get('pm_3b_dilayani', 0))}"), 0, 1, "L")
+    pdf.cell(0, 4, clean_str(f"   - Sertifikat SLHS: {d.get('sertif_slhs')} | Sertifikat Halal: {d.get('sertif_halal')} | Sertifikat BNSP Chef: {d.get('sertif_bnsp')}"), 0, 1, "L")
 
     pdf.cell(0, 5, "2. AIR BERSIH", 0, 1, "L")
-    pdf.cell(
-        0,
-        4,
-        clean_str(f"   - Air Minum: {d.get('air_minum_sumber')} | pH: {d.get('air_minum_ph')} | Tgl/Jam Ambil: {d.get('air_minum_tgljam')}"),
-        0,
-        1,
-        "L",
-    )
-    pdf.cell(
-        0,
-        4,
-        clean_str(f"   - Air Masak: {d.get('air_masak_sumber')} | pH: {d.get('air_masak_ph')} | Tgl/Jam Ambil: {d.get('air_masak_tgljam')}"),
-        0,
-        1,
-        "L",
-    )
+    pdf.cell(0, 4, clean_str(f"   - Air Minum: {d.get('air_minum_sumber')} | pH: {d.get('air_minum_ph')} | Tgl/Jam Ambil: {d.get('air_minum_tgljam')}"), 0, 1, "L")
+    pdf.cell(0, 4, clean_str(f"   - Air Masak: {d.get('air_masak_sumber')} | pH: {d.get('air_masak_ph')} | Tgl/Jam Ambil: {d.get('air_masak_tgljam')}"), 0, 1, "L")
 
     pdf.cell(0, 5, "3. KONDISI RUANGAN", 0, 1, "L")
-    pdf.cell(
-        0,
-        4,
-        clean_str(f"   - Termometer Berfungsi: {d.get('ruang_termo')} (Ket: {d.get('ruang_termo_ket')})"),
-        0,
-        1,
-        "L",
-    )
-    pdf.cell(
-        0,
-        4,
-        clean_str(f"   - Suhu Ruangan Sesuai (25-30 deg C): {d.get('ruang_suhu')} (Suhu Terkini: {d.get('suhu_terkini')} deg C)"),
-        0,
-        1,
-        "L",
-    )
-    pdf.cell(
-        0,
-        4,
-        clean_str(f"   - Kebersihan Ruangan: {d.get('ruang_bersih')} (Catatan: {d.get('ruang_bersih_ket')})"),
-        0,
-        1,
-        "L",
-    )
-    pdf.cell(
-        0,
-        4,
-        clean_str(f"   - Insect Killer Berfungsi: {d.get('insect_killer')} (Jumlah Berfungsi: {d.get('insect_killer_unit')} unit)"),
-        0,
-        1,
-        "L",
-    )
+    pdf.cell(0, 4, clean_str(f"   - Termometer Berfungsi: {d.get('ruang_termo')} (Ket: {d.get('ruang_termo_ket')})"), 0, 1, "L")
+    pdf.cell(0, 4, clean_str(f"   - Suhu Ruangan Sesuai (25-30 deg C): {d.get('ruang_suhu')} (Suhu Terkini: {d.get('suhu_terkini')} deg C)"), 0, 1, "L")
+    pdf.cell(0, 4, clean_str(f"   - Kebersihan Ruangan: {d.get('ruang_bersih')} (Catatan: {d.get('ruang_bersih_ket')})"), 0, 1, "L")
+    pdf.cell(0, 4, clean_str(f"   - Insect Killer Berfungsi: {d.get('insect_killer')} (Jumlah Berfungsi: {d.get('insect_killer_unit')} unit)"), 0, 1, "L")
     pdf.ln(2)
 
     # II. PENERIMAAN & PENYIMPANAN BAHAN BAKU
     print_section("II. PENERIMAAN DAN PENYIMPANAN BAHAN BAKU")
     pdf.cell(0, 4, "1. Spesifikasi Bahan Baku (Penerimaan):", 0, 1, "L")
-    for kat in [
-        "Karbohidrat",
-        "Protein Hewani",
-        "Protein Nabati",
-        "Buah",
-        "Sayur",
-    ]:
+    for kat in ["Karbohidrat", "Protein Hewani", "Protein Nabati", "Buah", "Sayur"]:
         k = kat.lower().replace(" ", "_")
-        pdf.cell(
-            0,
-            4,
-            clean_str(f"   - {kat}: Jml ({d.get(f'bb_{k}_jml')}) | Kualitas ({d.get(f'bb_{k}_kual')}) | Jam ({d.get(f'bb_{k}_jam')}) | Penerima ({d.get(f'bb_{k}_nama')})"),
-            0,
-            1,
-            "L",
-        )
+        pdf.cell(0, 4, clean_str(f"   - {kat}: Jml ({d.get(f'bb_{k}_jml')}) | Kualitas ({d.get(f'bb_{k}_kual')}) | Jam ({d.get(f'bb_{k}_jam')}) | Penerima ({d.get(f'bb_{k}_nama')})"), 0, 1, "L")
 
-    pdf.cell(
-        0, 4, "2. Suhu Bahan Baku Beku & Ruang Penyimpanan:", 0, 1, "L"
-    )
-    pdf.cell(
-        0,
-        4,
-        clean_str(f"   - Beku 1: {d.get('beku1_nama')} ({d.get('beku1_suhu')} deg C, Jam {d.get('beku1_jam')})"),
-        0,
-        1,
-        "L",
-    )
-    pdf.cell(
-        0,
-        4,
-        clean_str(f"   - Beku 2: {d.get('beku2_nama')} ({d.get('beku2_suhu')} deg C, Jam {d.get('beku2_jam')})"),
-        0,
-        1,
-        "L",
-    )
-    pdf.cell(
-        0,
-        4,
-        clean_str(f"   - Suhu Chiller: {d.get('suhu_chiller')} deg C (Jam {d.get('jam_chiller')}) | Suhu Freezer: {d.get('suhu_freezer')} deg C (Jam {d.get('jam_freezer')})"),
-        0,
-        1,
-        "L",
-    )
+    pdf.cell(0, 4, "2. Suhu Bahan Baku Beku & Ruang Penyimpanan:", 0, 1, "L")
+    pdf.cell(0, 4, clean_str(f"   - Beku 1: {d.get('beku1_nama')} ({d.get('beku1_suhu')} deg C, Jam {d.get('beku1_jam')})"), 0, 1, "L")
+    pdf.cell(0, 4, clean_str(f"   - Beku 2: {d.get('beku2_nama')} ({d.get('beku2_suhu')} deg C, Jam {d.get('beku2_jam')})"), 0, 1, "L")
+    pdf.cell(0, 4, clean_str(f"   - Suhu Chiller: {d.get('suhu_chiller')} deg C (Jam {d.get('jam_chiller')}) | Suhu Freezer: {d.get('suhu_freezer')} deg C (Jam {d.get('jam_freezer')})"), 0, 1, "L")
 
     pdf.cell(0, 4, "3. Bahan Makanan & Rotasi:", 0, 1, "L")
-    pdf.cell(
-        0,
-        4,
-        clean_str(f"   - Pencucian Pakai Sumber Air di Atas: {d.get('cuci_air_sesuai')} (Sumber: {d.get('sumber_air_cuci')})"),
-        0,
-        1,
-        "L",
-    )
-    pdf.cell(
-        0,
-        4,
-        clean_str(f"   - Tahu Disimpan di Chiller: {d.get('tahu_chiller')} (Suhu Chiller: {d.get('tahu_suhu_chiller')} deg C)"),
-        0,
-        1,
-        "L",
-    )
-    pdf.cell(
-        0,
-        4,
-        clean_str(f"   - Rotasi FIFO/FEFO: {d.get('fifo_fefo')} (Ket: {d.get('fifo_ket')})"),
-        0,
-        1,
-        "L",
-    )
+    pdf.cell(0, 4, clean_str(f"   - Pencucian Pakai Sumber Air di Atas: {d.get('cuci_air_sesuai')} (Sumber: {d.get('sumber_air_cuci')})"), 0, 1, "L")
+    pdf.cell(0, 4, clean_str(f"   - Tahu Disimpan di Chiller: {d.get('tahu_chiller')} (Suhu Chiller: {d.get('tahu_suhu_chiller')} deg C)"), 0, 1, "L")
+    pdf.cell(0, 4, clean_str(f"   - Rotasi FIFO/FEFO: {d.get('fifo_fefo')} (Ket: {d.get('fifo_ket')})"), 0, 1, "L")
     pdf.ln(2)
 
     # III. PERSIAPAN, PENGOLAHAN DAN PENDINGINAN
     print_section("III. PERSIAPAN, PENGOLAHAN DAN PENDINGINAN")
-    pdf.cell(
-        0,
-        4,
-        clean_str(f"1. Higiene Tim Persiapan: Sakit ({d.get('p_sakit')}) | APD ({d.get('p_apd')}) | CTPS ({d.get('p_ctps')})"),
-        0,
-        1,
-        "L",
-    )
-    pdf.cell(
-        0,
-        4,
-        clean_str(f"2. Persiapan: SOP Prohe ({d.get('p_sop_prohe')}) | Bahan Berbau/Lendir ({d.get('p_bahan_rusak')}) | Kendala ({d.get('p_kendala')})"),
-        0,
-        1,
-        "L",
-    )
+    pdf.cell(0, 4, clean_str(f"1. Higiene Tim Persiapan: Sakit ({d.get('p_sakit')}) | APD ({d.get('p_apd')}) | CTPS ({d.get('p_ctps')})"), 0, 1, "L")
+    pdf.cell(0, 4, clean_str(f"2. Persiapan: SOP Prohe ({d.get('p_sop_prohe')}) | Bahan Berbau/Lendir ({d.get('p_bahan_rusak')}) | Kendala ({d.get('p_kendala')})"), 0, 1, "L")
 
     pdf.cell(0, 4, "3. Status Menu Rawan Hari Ini:", 0, 1, "L")
-    pdf.cell(
-        0,
-        4,
-        clean_str(f"   - Ikan/Seafood: {d.get('mr_ikan')} | Ayam Bersantan: {d.get('mr_ayam_santan')}"),
-        0,
-        1,
-        "L",
-    )
-    pdf.cell(
-        0,
-        4,
-        clean_str(f"   - Ayam Suwir/Olahan Ulang: {d.get('mr_ayam_suwir')} | Telur Dadar: {d.get('mr_telur')} | Susu: {d.get('mr_susu')}"),
-        0,
-        1,
-        "L",
-    )
+    pdf.cell(0, 4, clean_str(f"   - Ikan/Seafood: {d.get('mr_ikan')} | Ayam Bersantan: {d.get('mr_ayam_santan')}"), 0, 1, "L")
+    pdf.cell(0, 4, clean_str(f"   - Ayam Suwir/Olahan Ulang: {d.get('mr_ayam_suwir')} | Telur Dadar: {d.get('mr_telur')} | Susu: {d.get('mr_susu')}"), 0, 1, "L")
 
-    pdf.cell(
-        0,
-        4,
-        clean_str(f"4. Higiene Tim Pengolahan: Sakit ({d.get('o_sakit')}) | APD ({d.get('o_apd')}) | CTPS ({d.get('o_ctps')})"),
-        0,
-        1,
-        "L",
-    )
-    pdf.cell(
-        0,
-        4,
-        clean_str(f"5. Pengolahan: Matang Sempurna ({d.get('o_matang')}) | Suhu Matang ({d.get('o_suhu_matang')} deg C, Jam {d.get('o_jam_matang')}) | SOP ({d.get('o_sop')}) | Kendala ({d.get('o_kendala')})"),
-        0,
-        1,
-        "L",
-    )
-    pdf.cell(
-        0,
-        4,
-        clean_str(f"6. Pendinginan: Ruang Steril ({d.get('dingin_ruang')}) | Suhu Diukur ({d.get('dingin_suhu')} deg C) | Nasi >2 jam Ruang ({d.get('nasi_suhu_ruang')})"),
-        0,
-        1,
-        "L",
-    )
+    pdf.cell(0, 4, clean_str(f"4. Higiene Tim Pengolahan: Sakit ({d.get('o_sakit')}) | APD ({d.get('o_apd')}) | CTPS ({d.get('o_ctps')})"), 0, 1, "L")
+    pdf.cell(0, 4, clean_str(f"5. Pengolahan: Matang Sempurna ({d.get('o_matang')}) | Suhu Matang ({d.get('o_suhu_matang')} deg C, Jam {d.get('o_jam_matang')}) | SOP ({d.get('o_sop')}) | Kendala ({d.get('o_kendala')})"), 0, 1, "L")
+    pdf.cell(0, 4, clean_str(f"6. Pendinginan: Ruang Steril ({d.get('dingin_ruang')}) | Suhu Diukur ({d.get('dingin_suhu')} deg C) | Nasi >2 jam Ruang ({d.get('nasi_suhu_ruang')})"), 0, 1, "L")
     pdf.ln(2)
 
     # IV. PEMORSIAN DAN DISTRIBUSI
     print_section("IV. PEMORSIAN DAN DISTRIBUSI")
-    pdf.cell(
-        0,
-        4,
-        clean_str(f"1. Pemorsian: Gizi & URT Sesuai ({d.get('pors_gizi')}) | Suhu Pemorsian ({d.get('pors_suhu')} deg C)"),
-        0,
-        1,
-        "L",
-    )
-    pdf.cell(
-        0,
-        4,
-        clean_str(f"   - Quality Control / Organoleptik: Oleh ({d.get('qc_oleh')}), Jam ({d.get('qc_jam')}), Hasil ({d.get('qc_hasil')})"),
-        0,
-        1,
-        "L",
-    )
-    pdf.cell(
-        0,
-        4,
-        clean_str(f"   - Sample Menu Simpan (2 Sampel): {d.get('sampel_2menu')} | Kendala: {d.get('pors_kendala')}"),
-        0,
-        1,
-        "L",
-    )
-    pdf.cell(
-        0,
-        4,
-        clean_str(f"   - Sisa Makanan Pemorsian: Nasi ({d.get('sisa_nasi')} kg), Prohe ({d.get('sisa_prohe')} kg), Prona ({d.get('sisa_prona')} kg), Sayur ({d.get('sisa_sayur')} kg), Buah ({d.get('sisa_buah')} kg)"),
-        0,
-        1,
-        "L",
-    )
+    pdf.cell(0, 4, clean_str(f"1. Pemorsian: Gizi & URT Sesuai ({d.get('pors_gizi')}) | Suhu Pemorsian ({d.get('pors_suhu')} deg C)"), 0, 1, "L")
+    pdf.cell(0, 4, clean_str(f"   - Quality Control / Organoleptik: Oleh ({d.get('qc_oleh')}), Jam ({d.get('qc_jam')}), Hasil ({d.get('qc_hasil')})"), 0, 1, "L")
+    pdf.cell(0, 4, clean_str(f"   - Sample Menu Simpan (2 Sampel): {d.get('sampel_2menu')} | Kendala: {d.get('pors_kendala')}"), 0, 1, "L")
+    pdf.cell(0, 4, clean_str(f"   - Sisa Makanan Pemorsian: Nasi ({d.get('sisa_nasi')} kg), Prohe ({d.get('sisa_prohe')} kg), Prona ({d.get('sisa_prona')} kg), Sayur ({d.get('sisa_sayur')} kg), Buah ({d.get('sisa_buah')} kg)"), 0, 1, "L")
 
-    pdf.cell(
-        0,
-        4,
-        clean_str(f"2. Alat & Tempat: Alat Terpisah ({d.get('alat_pisah')}) | Meja/Alat Bersih ({d.get('meja_bersih')}) | Bebas Bocor/Genangan ({d.get('sanitasi_fisik')})"),
-        0,
-        1,
-        "L",
-    )
+    pdf.cell(0, 4, clean_str(f"2. Alat & Tempat: Alat Terpisah ({d.get('alat_pisah')}) | Meja/Alat Bersih ({d.get('meja_bersih')}) | Bebas Bocor/Genangan ({d.get('sanitasi_fisik')})"), 0, 1, "L")
 
     pdf.cell(0, 4, "3. Rantai Distribusi:", 0, 1, "L")
-    pdf.cell(
-        0,
-        4,
-        clean_str(f"   - Jam Selesai Masak: {d.get('jam_selesai_masak')} | Jam Berangkat: {d.get('jam_berangkat')} | Jam Sampai: {d.get('jam_sampai')} | Jam Konsumsi: {d.get('jam_konsumsi')}"),
-        0,
-        1,
-        "L",
-    )
-    pdf.cell(
-        0,
-        4,
-        clean_str(f"   - Label/Segel Ompreng: {d.get('label_segel')} | Suhu Bagikan (Panas: {d.get('suhu_dist_panas')} deg C / Dingin: {d.get('suhu_dist_dingin')} deg C)"),
-        0,
-        1,
-        "L",
-    )
+    pdf.cell(0, 4, clean_str(f"   - Jam Selesai Masak: {d.get('jam_selesai_masak')} | Jam Berangkat: {d.get('jam_berangkat')} | Jam Sampai: {d.get('jam_sampai')} | Jam Konsumsi: {d.get('jam_konsumsi')}"), 0, 1, "L")
+    pdf.cell(0, 4, clean_str(f"   - Label/Segel Ompreng: {d.get('label_segel')} | Suhu Bagikan (Panas: {d.get('suhu_dist_panas')} deg C / Dingin: {d.get('suhu_dist_dingin')} deg C)"), 0, 1, "L")
     pdf.cell(0, 4, clean_str(f"   - Kendala Distribusi: {d.get('dist_kendala')}"), 0, 1, "L")
     pdf.ln(2)
 
@@ -395,40 +201,35 @@ def generate_pdf(d):
     pdf.set_font("Arial", "B", 9)
     pdf.cell(0, 5, clean_str(f"KEPUTUSAN FINAL: {d.get('keputusan_final')}"), 0, 1, "L")
     pdf.set_font("Arial", "I", 8)
-    pdf.cell(
-        0,
-        4,
-        "Kontak Darurat: PSC 119 WA +62 8777 7591097 | pheoc.indonesia@kemkes.go.id",
-        0,
-        1,
-        "L",
-    )
+    pdf.cell(0, 4, "Kontak Darurat: PSC 119 WA +62 8777 7591097 | pheoc.indonesia@kemkes.go.id", 0, 1, "L")
 
-    # Output aman sebagai byte stream
+    # Return bytes aman
     out = pdf.output(dest="S")
     if isinstance(out, str):
         return out.encode("latin1")
     return bytes(out)
 
-
 # ==========================================
-# 3. ANTARMUKA STREAMLIT (UI)
+# 5. ANTARMUKA APKLIKASI (DASHBOARD FORMS)
 # ==========================================
-st.title("📋 Sistem Checklist Monitoring & PDF Generator SPPG")
+st.title("📋 Sistem Checklist Monitoring SPPG")
 st.caption("Aplikasi Input Laporan Harian Dapur SPPG - Badan Gizi Nasional")
 
 # Input Nama SPPG
-st.session_state.dapur_aktif = st.text_input(
-    "Unit Dapur / SPPG:", value=st.session_state.dapur_aktif
-)
+st.session_state.dapur_aktif = st.text_input("Unit Dapur / SPPG:", value=st.session_state.dapur_aktif)
 
 with st.form("form_presisi_pdf"):
     st.subheader("1. Identitas Tim & Jadwal")
     c1, c2 = st.columns(2)
     with c1:
-        f_kepala = st.text_input("Kepala SPPG", "Candra Tinumbara")
-        f_plok = st.text_input("Pengawas Keuangan (PLOK)", "Asep")
-        f_plog = st.text_input("Pengawas Gizi (Plog)", "Rina")
+        # Nama otomatis terisi sesuai login jika role cocok
+        default_kepala = st.session_state.user_name if st.session_state.user_role == "Kepala SPPG" else "Candra Tinumbara"
+        default_plok = st.session_state.user_name if st.session_state.user_role == "Pengawas Keuangan (PLOK)" else "Asep"
+        default_plog = st.session_state.user_name if st.session_state.user_role == "Pengawas Gizi (Plog)" else "Rina"
+        
+        f_kepala = st.text_input("Kepala SPPG", default_kepala)
+        f_plok = st.text_input("Pengawas Keuangan (PLOK)", default_plok)
+        f_plog = st.text_input("Pengawas Gizi (Plog)", default_plog)
     with c2:
         f_asisten = st.text_input("Asisten Lapangan", "Budi")
         f_chef = st.text_input("Chef", "Dedi")
@@ -438,18 +239,10 @@ with st.form("form_presisi_pdf"):
     st.subheader("2. Data Umum & Air Bersih")
     c3, c4 = st.columns(2)
     with c3:
-        f_pm_d_pot = st.number_input(
-            "PM Didik (Terdata)", min_value=0, value=300
-        )
-        f_pm_d_dil = st.number_input(
-            "PM Didik (Dilayani Hari Ini)", min_value=0, value=300
-        )
-        f_pm_3b_pot = st.number_input(
-            "PM 3B Bumil/Balita (Terdata)", min_value=0, value=50
-        )
-        f_pm_3b_dil = st.number_input(
-            "PM 3B Bumil/Balita (Dilayani)", min_value=0, value=50
-        )
+        f_pm_d_pot = st.number_input("PM Didik (Terdata)", min_value=0, value=300)
+        f_pm_d_dil = st.number_input("PM Didik (Dilayani Hari Ini)", min_value=0, value=300)
+        f_pm_3b_pot = st.number_input("PM 3B Bumil/Balita (Terdata)", min_value=0, value=50)
+        f_pm_3b_dil = st.number_input("PM 3B Bumil/Balita (Dilayani)", min_value=0, value=50)
     with c4:
         f_slhs = st.selectbox("Sertifikat SLHS", ["Ada", "Tidak Ada/Proses"])
         f_halal = st.selectbox("Sertifikat Halal", ["Ada", "Tidak Ada/Proses"])
@@ -605,7 +398,6 @@ with st.form("form_presisi_pdf"):
         ["LULUS / LAYAK DISTRIBUSI", "LULUS DENGAN CATATAN", "DITOLAK / TIDAK LAYAK"]
     )
 
-    # Tombol Submit Form
     btn_submit = st.form_submit_button("💾 Proses & Siapkan PDF Resmi")
 
     if btn_submit:
@@ -724,13 +516,13 @@ with st.form("form_presisi_pdf"):
             "keputusan_final": f_keputusan_final,
         }
 
-        # Generate Bytes PDF Valid & Simpan ke Session State
+        # Simpan byte PDF valid
         st.session_state.pdf_data = generate_pdf(data_lap)
         st.session_state.pdf_filename = f"Checklist_SPPG_{st.session_state.dapur_aktif}_{date.today()}.pdf"
         st.success("PDF berhasil dibuat dan divalidasi! Silakan unduh tombol di bawah.")
 
 # ==========================================
-# 4. AREA TOMBOL UNDUH (DI LUAR FORM)
+# 6. AREA TOMBOL UNDUH
 # ==========================================
 if st.session_state.pdf_data:
     st.markdown("---")
