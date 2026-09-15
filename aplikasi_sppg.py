@@ -583,6 +583,8 @@ else:
                 "NO-GO - eskalasi ke Dinkes / BGN sebelum masak / distribusi dilanjutkan"
             ])
 
+          # ... (bagian isi form lainnya tetap sama) ...
+
             btn_submit = st.form_submit_button("💾 Proses & Siapkan PDF Resmi")
 
             if btn_submit:
@@ -618,15 +620,22 @@ else:
                     "label_segel": f_label_segel, "suhu_dist_panas": f_suhu_dist_panas, "suhu_dist_dingin": f_suhu_dist_dingin, "dist_kendala": f_dist_kendala,
                     "temuan_khusus": f_temuan_khusus, "keputusan_final": f_keputusan_final
                 }
-                st.success("Formulir berhasil diproses secara lengkap! Silakan unduh PDF di bawah.")
+                st.success("Formulir berhasil diproses! Silakan unduh PDF di bawah.")
 
+        # ==========================================
+        # UNDUH PDF (DI LUAR BLOK ST.FORM)
+        # ==========================================
         if st.session_state.data_laporan is not None:
             st.markdown("---")
             st.subheader("📥 Unduh Laporan Resmi PDF")
+            
+            # Generate bytes PDF
             pdf_bytes = generate_pdf(st.session_state.data_laporan)
+            
             st.download_button(
-                label="Unduh PDF Checklist SPPG Resmi",
+                label="📄 Klik Disini Untuk Unduh PDF Checklist SPPG",
                 data=pdf_bytes,
                 file_name=f"Checklist_SPPG_{st.session_state.dapur_aktif}_{date.today()}.pdf",
-                mime="application/pdf"
+                mime="application/pdf",
+                key="btn_download_pdf"
             )
