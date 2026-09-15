@@ -583,11 +583,17 @@ else:
                 "NO-GO - eskalasi ke Dinkes / BGN sebelum masak / distribusi dilanjutkan"
             ])
 
-          # ... (bagian isi form lainnya tetap sama) ...
+      # 1. Bungkus fungsi generate_pdf dengan cache agar bytes PDF tidak di-recreate berulang kali
+@st.cache_data
+def get_pdf_bytes(data):
+    return generate_pdf(data)
+
+# ... (Kode form kamu di sini) ...
 
             btn_submit = st.form_submit_button("💾 Proses & Siapkan PDF Resmi")
 
             if btn_submit:
+                # Simpan data laporan ke session state
                 st.session_state.data_laporan = {
                     "nama_sppg": st.session_state.dapur_aktif, "kepala_sppg": f_kepala, "plok": f_plok, "plog": f_plog,
                     "asisten_lapangan": f_asisten, "chef": f_chef, "tanggal": str(f_tanggal), "jam_zoom": str(f_jam_zoom),
@@ -620,22 +626,21 @@ else:
                     "label_segel": f_label_segel, "suhu_dist_panas": f_suhu_dist_panas, "suhu_dist_dingin": f_suhu_dist_dingin, "dist_kendala": f_dist_kendala,
                     "temuan_khusus": f_temuan_khusus, "keputusan_final": f_keputusan_final
                 }
-                st.success("Formulir berhasil diproses! Silakan unduh PDF di bawah.")
+                # Langsung render bytes ke session_state agar siap diunduh
+                st.session_state.pdf_ready = get_pdf_bytes(st.session_state.data_laporan)
+                st.success("PDF berhasil disiapkan!")
 
-        # ==========================================
-        # UNDUH PDF (DI LUAR BLOK ST.FORM)
-        # ==========================================
-        if st.session_state.data_laporan is not None:
-            st.markdown("---")
-            st.subheader("📥 Unduh Laporan Resmi PDF")
-            
-            # Generate bytes PDF
-            pdf_bytes = generate_pdf(st.session_state.data_laporan)
-            
-            st.download_button(
-                label="📄 Klik Disini Untuk Unduh PDF Checklist SPPG",
-                data=pdf_bytes,
-                file_name=f"Checklist_SPPG_{st.session_state.dapur_aktif}_{date.today()}.pdf",
-                mime="application/pdf",
-                key="btn_download_pdf"
-            )
+# ==========================================
+# TOMBOL UNDUH DI LUAR FORM
+# ==========================================
+if "pdf_ready" in st.session_state and st.session_state.pdf_ready is not None:
+    st.markdown("---")
+    st.subheader("📥 Unduh Laporan Resmi PDF")
+    
+    st.download_button(
+        label="📄 Klik Disini Untuk Unduh PDF Checklist SPPG",
+        data=st.session_state.pdf_ready,
+        file_name=f"Checklist_SPPG_{st.session_state.dapur_aktif}_{date.today()}.pdf",
+        mime="application/pdf",
+        key="btn_download_pdf_final"
+    )
