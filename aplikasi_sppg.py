@@ -167,6 +167,92 @@ def generate_pdf(d):
     pdf.set_font("Arial", "I", 8)
     pdf.cell(0, 4, "Kontak Darurat: PSC 119 WA +62 8777 7591097 | pheoc.indonesia@kemkes.go.id", 0, 1, "L")
 
+    # PERBAIKAN PENTING DI BAGIAN RETURN:
+    out = pdf.output()
+    if isinstance(out, str):
+        return out.encode("latin1")
+    return bytes(out)
+
+    def print_section(title):
+        pdf.set_fill_color(220, 230, 242)
+        pdf.set_font("Arial", "B", 9)
+        pdf.cell(0, 6, title, 1, 1, "L", fill=True)
+        pdf.set_font("Arial", "", 8)
+
+    # I. DATA UMUM
+    print_section("I. DATA UMUM")
+    pdf.cell(0, 5, "1. JUMLAH PENERIMA MANFAAT & SERTIFIKASI", 0, 1, "L")
+    pdf.cell(0, 4, f"   - PM Peserta Didik: Terdata ({d.get('pm_didik_potensi')}) | Dilayani Hari Ini ({d.get('pm_didik_dilayani')})", 0, 1, "L")
+    pdf.cell(0, 4, f"   - PM 3B (Bumil/Balita): Terdata ({d.get('pm_3b_potensi')}) | Dilayani Hari Ini ({d.get('pm_3b_dilayani')})", 0, 1, "L")
+    pdf.cell(0, 4, f"   - Total PM Dilayani: {int(d.get('pm_didik_dilayani', 0)) + int(d.get('pm_3b_dilayani', 0))}", 0, 1, "L")
+    pdf.cell(0, 4, f"   - Sertifikat SLHS: {d.get('sertif_slhs')} | Sertifikat Halal: {d.get('sertif_halal')} | Sertifikat BNSP Chef: {d.get('sertif_bnsp')}", 0, 1, "L")
+    
+    pdf.cell(0, 5, "2. AIR BERSIH", 0, 1, "L")
+    pdf.cell(0, 4, f"   - Air Minum: {d.get('air_minum_sumber')} | pH: {d.get('air_minum_ph')} | Tgl/Jam Ambil: {d.get('air_minum_tgljam')}", 0, 1, "L")
+    pdf.cell(0, 4, f"   - Air Masak: {d.get('air_masak_sumber')} | pH: {d.get('air_masak_ph')} | Tgl/Jam Ambil: {d.get('air_masak_tgljam')}", 0, 1, "L")
+    
+    pdf.cell(0, 5, "3. KONDISI RUANGAN", 0, 1, "L")
+    pdf.cell(0, 4, f"   - Termometer Berfungsi: {d.get('ruang_termo')} (Ket: {d.get('ruang_termo_ket')})", 0, 1, "L")
+    pdf.cell(0, 4, f"   - Suhu Ruangan Sesuai (25-30 deg C): {d.get('ruang_suhu')} (Suhu Terkini: {d.get('suhu_terkini')} deg C)", 0, 1, "L")
+    pdf.cell(0, 4, f"   - Kebersihan Ruangan: {d.get('ruang_bersih')} (Catatan: {d.get('ruang_bersih_ket')})", 0, 1, "L")
+    pdf.cell(0, 4, f"   - Insect Killer Berfungsi: {d.get('insect_killer')} (Jumlah Berfungsi: {d.get('insect_killer_unit')} unit)", 0, 1, "L")
+    pdf.ln(2)
+
+    # II. PENERIMAAN & PENYIMPANAN BAHAN BAKU
+    print_section("II. PENERIMAAN DAN PENYIMPANAN BAHAN BAKU")
+    pdf.cell(0, 4, "1. Spesifikasi Bahan Baku (Penerimaan):", 0, 1, "L")
+    for kat in ["Karbohidrat", "Protein Hewani", "Protein Nabati", "Buah", "Sayur"]:
+        k = kat.lower().replace(" ", "_")
+        pdf.cell(0, 4, f"   - {kat}: Jml ({d.get(f'bb_{k}_jml')}) | Kualitas ({d.get(f'bb_{k}_kual')}) | Jam ({d.get(f'bb_{k}_jam')}) | Penerima ({d.get(f'bb_{k}_nama')})", 0, 1, "L")
+    
+    pdf.cell(0, 4, "2. Suhu Bahan Baku Beku & Ruang Penyimpanan:", 0, 1, "L")
+    pdf.cell(0, 4, f"   - Beku 1: {d.get('beku1_nama')} ({d.get('beku1_suhu')} deg C, Jam {d.get('beku1_jam')})", 0, 1, "L")
+    pdf.cell(0, 4, f"   - Beku 2: {d.get('beku2_nama')} ({d.get('beku2_suhu')} deg C, Jam {d.get('beku2_jam')})", 0, 1, "L")
+    pdf.cell(0, 4, f"   - Suhu Chiller: {d.get('suhu_chiller')} deg C (Jam {d.get('jam_chiller')}) | Suhu Freezer: {d.get('suhu_freezer')} deg C (Jam {d.get('jam_freezer')})", 0, 1, "L")
+    
+    pdf.cell(0, 4, "3. Bahan Makanan & Rotasi:", 0, 1, "L")
+    pdf.cell(0, 4, f"   - Pencucian Pakai Sumber Air di Atas: {d.get('cuci_air_sesuai')} (Sumber: {d.get('sumber_air_cuci')})", 0, 1, "L")
+    pdf.cell(0, 4, f"   - Tahu Disimpan di Chiller: {d.get('tahu_chiller')} (Suhu Chiller: {d.get('tahu_suhu_chiller')} deg C)", 0, 1, "L")
+    pdf.cell(0, 4, f"   - Rotasi FIFO/FEFO: {d.get('fifo_fefo')} (Ket: {d.get('fifo_ket')})", 0, 1, "L")
+    pdf.ln(2)
+
+    # III. PERSIAPAN, PENGOLAHAN DAN PENDINGINAN
+    print_section("III. PERSIAPAN, PENGOLAHAN DAN PENDINGINAN")
+    pdf.cell(0, 4, f"1. Higiene Tim Persiapan: Sakit ({d.get('p_sakit')}) | APD ({d.get('p_apd')}) | CTPS ({d.get('p_ctps')})", 0, 1, "L")
+    pdf.cell(0, 4, f"2. Persiapan: SOP Prohe ({d.get('p_sop_prohe')}) | Bahan Berbau/Lendir ({d.get('p_bahan_rusak')}) | Kendala ({d.get('p_kendala')})", 0, 1, "L")
+    
+    pdf.cell(0, 4, "3. Status Menu Rawan Hari Ini:", 0, 1, "L")
+    pdf.cell(0, 4, f"   - Ikan/Seafood: {d.get('mr_ikan')} | Ayam Bersantan: {d.get('mr_ayam_santan')}", 0, 1, "L")
+    pdf.cell(0, 4, f"   - Ayam Suwir/Olahan Ulang: {d.get('mr_ayam_suwir')} | Telur Dadar: {d.get('mr_telur')} | Susu: {d.get('mr_susu')}", 0, 1, "L")
+    
+    pdf.cell(0, 4, f"4. Higiene Tim Pengolahan: Sakit ({d.get('o_sakit')}) | APD ({d.get('o_apd')}) | CTPS ({d.get('o_ctps')})", 0, 1, "L")
+    pdf.cell(0, 4, f"5. Pengolahan: Matang Sempurna ({d.get('o_matang')}) | Suhu Matang ({d.get('o_suhu_matang')} deg C, Jam {d.get('o_jam_matang')}) | SOP ({d.get('o_sop')}) | Kendala ({d.get('o_kendala')})", 0, 1, "L")
+    pdf.cell(0, 4, f"6. Pendinginan: Ruang Steril ({d.get('dingin_ruang')}) | Suhu Diukur ({d.get('dingin_suhu')} deg C) | Nasi >2 jam Ruang ({d.get('nasi_suhu_ruang')})", 0, 1, "L")
+    pdf.ln(2)
+
+    # IV. PEMORSIAN DAN DISTRIBUSI
+    print_section("IV. PEMORSIAN DAN DISTRIBUSI")
+    pdf.cell(0, 4, f"1. Pemorsian: Gizi & URT Sesuai ({d.get('pors_gizi')}) | Suhu Pemorsian ({d.get('pors_suhu')} deg C)", 0, 1, "L")
+    pdf.cell(0, 4, f"   - Quality Control / Organoleptik: Oleh ({d.get('qc_oleh')}), Jam ({d.get('qc_jam')}), Hasil ({d.get('qc_hasil')})", 0, 1, "L")
+    pdf.cell(0, 4, f"   - Sample Menu Simpan (2 Sampel): {d.get('sampel_2menu')} | Kendala: {d.get('pors_kendala')}", 0, 1, "L")
+    pdf.cell(0, 4, f"   - Sisa Makanan Pemorsian: Nasi ({d.get('sisa_nasi')} kg), Prohe ({d.get('sisa_prohe')} kg), Prona ({d.get('sisa_prona')} kg), Sayur ({d.get('sisa_sayur')} kg), Buah ({d.get('sisa_buah')} kg)", 0, 1, "L")
+    
+    pdf.cell(0, 4, f"2. Alat & Tempat: Alat Terpisah ({d.get('alat_pisah')}) | Meja/Alat Bersih ({d.get('meja_bersih')}) | Bebas Bocor/Genangan ({d.get('sanitasi_fisik')})", 0, 1, "L")
+    
+    pdf.cell(0, 4, "3. Rantai Distribusi:", 0, 1, "L")
+    pdf.cell(0, 4, f"   - Jam Selesai Masak: {d.get('jam_selesai_masak')} | Jam Berangkat: {d.get('jam_berangkat')} | Jam Sampai: {d.get('jam_sampai')} | Jam Konsumsi: {d.get('jam_konsumsi')}", 0, 1, "L")
+    pdf.cell(0, 4, f"   - Label/Segel Ompreng: {d.get('label_segel')} | Suhu Bagikan (Panas: {d.get('suhu_dist_panas')} deg C / Dingin: {d.get('suhu_dist_dingin')} deg C)", 0, 1, "L")
+    pdf.cell(0, 4, f"   - Kendala Distribusi: {d.get('dist_kendala')}", 0, 1, "L")
+    pdf.ln(2)
+
+    # V. TEMUAN & KEPUTUSAN
+    print_section("V. TEMUAN & KEPUTUSAN FINAL")
+    pdf.cell(0, 4, f"Temuan Operasional: {d.get('temuan_khusus')}", 0, 1, "L")
+    pdf.set_font("Arial", "B", 9)
+    pdf.cell(0, 5, f"KEPUTUSAN FINAL: {d.get('keputusan_final')}", 0, 1, "L")
+    pdf.set_font("Arial", "I", 8)
+    pdf.cell(0, 4, "Kontak Darurat: PSC 119 WA +62 8777 7591097 | pheoc.indonesia@kemkes.go.id", 0, 1, "L")
+
     return bytes(pdf.output(dest="S"))
 
 
